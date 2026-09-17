@@ -59,6 +59,72 @@ const TAB_META: { id: Tab; label: string; color: string }[] = [
   { id: "reels90", label: "Reels 90s", color: "text-purple-400" },
 ];
 
+const VARIANT_META = [
+  { key: "tiktok30" as const, label: "TikTok 30s", color: "text-pink-400", border: "border-pink-900" },
+  { key: "shorts55" as const, label: "Shorts 55s", color: "text-red-400", border: "border-red-900" },
+  { key: "reels90" as const, label: "Reels 90s", color: "text-purple-400", border: "border-purple-900" },
+];
+
+function MatchBadge({ matches }: { matches: boolean }) {
+  return matches ? (
+    <span className="text-xs font-medium text-emerald-400 bg-emerald-950 border border-emerald-800 rounded px-1.5 py-0.5">
+      ✓ match
+    </span>
+  ) : (
+    <span className="text-xs font-medium text-red-400 bg-red-950 border border-red-800 rounded px-1.5 py-0.5">
+      ✗ mismatch
+    </span>
+  );
+}
+
+function VariantIntegrityPanel({
+  hook,
+  loopEnding,
+  variants,
+}: {
+  hook: string;
+  loopEnding: string;
+  variants: GeneratedStory["platformVariants"];
+}) {
+  return (
+    <div className="mb-4">
+      <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
+        Hook / Loop Ending — Variant Integrity Check
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {VARIANT_META.map(({ key, label, color, border }) => {
+          const beats = variants[key];
+          const firstNarration = beats[0]?.narration ?? "";
+          const lastNarration = beats[beats.length - 1]?.narration ?? "";
+          const hookMatches =
+            firstNarration === hook || firstNarration.startsWith(hook);
+          const endingMatches =
+            lastNarration === loopEnding || lastNarration.endsWith(loopEnding);
+          return (
+            <div key={key} className={`bg-gray-900 border ${border} rounded-lg p-3`}>
+              <p className={`text-xs font-semibold mb-3 ${color}`}>{label}</p>
+              <div className="mb-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs text-gray-500 uppercase tracking-wide">Hook</span>
+                  <MatchBadge matches={hookMatches} />
+                </div>
+                <p className="text-xs text-gray-300 leading-relaxed">{firstNarration}</p>
+              </div>
+              <div className="border-t border-gray-800 pt-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs text-gray-500 uppercase tracking-wide">Loop Ending</span>
+                  <MatchBadge matches={endingMatches} />
+                </div>
+                <p className="text-xs text-gray-300 leading-relaxed">{lastNarration}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function BeatList({ beats }: { beats: StoryBeat[] }) {
   const totalSec = beats.reduce((s, b) => s + b.durationSec, 0);
   const totalWords = beats.reduce(
@@ -72,28 +138,17 @@ function BeatList({ beats }: { beats: StoryBeat[] }) {
       </p>
       <div className="space-y-4">
         {beats.map((beat) => (
-          <div
-            key={beat.beatNumber}
-            className="border-l-2 border-gray-700 pl-4"
-          >
+          <div key={beat.beatNumber} className="border-l-2 border-gray-700 pl-4">
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-1">
               <span className="text-gray-500">#{beat.beatNumber}</span>
-              <span
-                className={
-                  EMOTION_COLORS[beat.emotion] ?? "text-gray-400"
-                }
-              >
+              <span className={EMOTION_COLORS[beat.emotion] ?? "text-gray-400"}>
                 {beat.emotion}
               </span>
               <span className="text-blue-400">{beat.voiceRole}</span>
               <span className="text-gray-500">{beat.durationSec}s</span>
             </div>
-            <p className="text-sm text-gray-100 mb-1 leading-relaxed">
-              {beat.narration}
-            </p>
-            <p className="text-xs text-gray-500 italic leading-relaxed">
-              {beat.visualPrompt}
-            </p>
+            <p className="text-sm text-gray-100 mb-1 leading-relaxed">{beat.narration}</p>
+            <p className="text-xs text-gray-500 italic leading-relaxed">{beat.visualPrompt}</p>
           </div>
         ))}
       </div>
@@ -138,9 +193,7 @@ export default function TestPage() {
   return (
     <main className="min-h-screen bg-gray-950 text-gray-100 p-8 font-mono">
       <h1 className="text-2xl font-bold mb-1 text-white">Story Engine</h1>
-      <p className="text-xs text-gray-500 mb-8">
-        claude-sonnet-4-6 · real generation
-      </p>
+      <p className="text-xs text-gray-500 mb-8">claude-sonnet-4-6 · real generation</p>
 
       {/* ── Form ── */}
       <form
@@ -155,9 +208,7 @@ export default function TestPage() {
             className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
           >
             {ALL_GENRES.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.label}
-              </option>
+              <option key={g.id} value={g.id}>{g.label}</option>
             ))}
           </select>
         </div>
@@ -168,10 +219,7 @@ export default function TestPage() {
             <select
               value={form.tone}
               onChange={(e) =>
-                setForm({
-                  ...form,
-                  tone: e.target.value as StoryRequest["tone"],
-                })
+                setForm({ ...form, tone: e.target.value as StoryRequest["tone"] })
               }
               className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
             >
@@ -185,10 +233,7 @@ export default function TestPage() {
             <select
               value={form.targetLength}
               onChange={(e) =>
-                setForm({
-                  ...form,
-                  targetLength: e.target.value as StoryRequest["targetLength"],
-                })
+                setForm({ ...form, targetLength: e.target.value as StoryRequest["targetLength"] })
               }
               className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
             >
@@ -205,9 +250,7 @@ export default function TestPage() {
             type="checkbox"
             id="seriesMode"
             checked={form.seriesMode}
-            onChange={(e) =>
-              setForm({ ...form, seriesMode: e.target.checked })
-            }
+            onChange={(e) => setForm({ ...form, seriesMode: e.target.checked })}
             className="w-4 h-4 accent-indigo-500"
           />
           <label htmlFor="seriesMode" className="text-xs text-gray-400">
@@ -218,9 +261,7 @@ export default function TestPage() {
         {form.seriesMode && (
           <div className="space-y-3">
             <div>
-              <label className="block text-xs text-gray-400 mb-1">
-                Episode Number
-              </label>
+              <label className="block text-xs text-gray-400 mb-1">Episode Number</label>
               <input
                 type="number"
                 min={1}
@@ -228,9 +269,7 @@ export default function TestPage() {
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    episodeNumber: e.target.value
-                      ? parseInt(e.target.value)
-                      : undefined,
+                    episodeNumber: e.target.value ? parseInt(e.target.value) : undefined,
                   })
                 }
                 className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
@@ -244,9 +283,7 @@ export default function TestPage() {
               <textarea
                 rows={3}
                 value={form.seriesContext ?? ""}
-                onChange={(e) =>
-                  setForm({ ...form, seriesContext: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, seriesContext: e.target.value })}
                 className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"
                 placeholder="Describe what happened in prior episodes..."
               />
@@ -283,25 +320,24 @@ export default function TestPage() {
             </span>
           </div>
 
-          {/* Hook + Loop Ending */}
+          {/* Hook + Loop Ending (canonical) */}
           <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 mb-4">
             <div className="mb-3">
-              <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide">
-                Hook
-              </p>
-              <p className="text-indigo-300 text-sm leading-relaxed">
-                {result.hook}
-              </p>
+              <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide">Hook</p>
+              <p className="text-indigo-300 text-sm leading-relaxed">{result.hook}</p>
             </div>
             <div className="border-t border-gray-800 pt-3">
-              <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide">
-                Loop Ending
-              </p>
-              <p className="text-indigo-300 text-sm leading-relaxed">
-                {result.loopEnding}
-              </p>
+              <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide">Loop Ending</p>
+              <p className="text-indigo-300 text-sm leading-relaxed">{result.loopEnding}</p>
             </div>
           </div>
+
+          {/* Variant integrity — side-by-side hook/loopEnding across 30s / 55s / 90s */}
+          <VariantIntegrityPanel
+            hook={result.hook}
+            loopEnding={result.loopEnding}
+            variants={result.platformVariants}
+          />
 
           {/* Platform tabs */}
           <div className="flex gap-1 mb-4 bg-gray-900 border border-gray-800 rounded-lg p-1">
