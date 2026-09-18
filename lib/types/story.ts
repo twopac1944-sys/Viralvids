@@ -18,6 +18,7 @@ export interface GeneratedStory {
   beats: StoryBeat[];
   totalWordCount: number;
   resolvedStoryMode: ResolvedStoryMode;
+  resolvedGenre: string;     // the actual genre id used (differs from "auto" when auto was requested)
   platformVariants: {
     tiktok30: StoryBeat[];   // condensed beat set for ~30 sec
     shorts55: StoryBeat[];   // condensed beat set for ~55 sec
@@ -26,7 +27,7 @@ export interface GeneratedStory {
 }
 
 export interface StoryRequest {
-  genre: string;
+  genre: string;             // specific genre id OR "auto"
   tone: "dark" | "neutral" | "uplifting";
   targetLength: "30s" | "60s" | "90s" | "3min";
   storyMode: StoryMode;

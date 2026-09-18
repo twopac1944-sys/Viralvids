@@ -5,6 +5,8 @@ export interface GenrePack {
   toneDefault: "dark" | "neutral" | "uplifting";
   visualStyleKeywords: string[];
   voiceStyleNotes: string;
+  /** Informational only — not used by auto storyMode resolver */
+  defaultStoryMode?: "dialogue" | "narration" | "hybrid";
 }
 
 export const genres: GenrePack[] = [
@@ -270,6 +272,17 @@ export const genres: GenrePack[] = [
     visualStyleKeywords: ["storybook illustration", "dark enchanted forest", "deep saturated color", "uncanny", "baroque"],
     voiceStyleNotes:
       "Once-upon-a-time cadence corrupted by dread. Beautiful language describing terrible things.",
+  },
+  {
+    id: "feel-good",
+    name: "Feel-Good",
+    description:
+      "Heartwarming, hopeful stories with genuinely happy or satisfying resolutions — reunions, kindness rewarded, small wins, found family, second chances that actually land.",
+    toneDefault: "uplifting",
+    visualStyleKeywords: ["warm lighting", "golden hour", "soft focus", "genuine smiles", "bright color palette", "cozy inviting settings"],
+    voiceStyleNotes:
+      "Warm, genuine, unhurried delivery — earned emotion, not forced positivity. Let the joy arrive naturally.",
+    defaultStoryMode: "dialogue",
   },
 ];
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StoryRequest, GeneratedStory, StoryBeat, ResolvedStoryMode } from "@/lib/types/story";
 import { getGenre } from "@/lib/genres/genres";
+import { resolveGenre } from "@/lib/genres/resolveGenre";
 import { buildStoryPrompt } from "@/lib/claude/storyPrompts";
 import claudeClient from "@/lib/claude/client";
 
@@ -30,6 +31,7 @@ function isValidStory(data: unknown): data is GeneratedStory {
     typeof s.loopEnding === "string" &&
     typeof s.totalWordCount === "number" &&
     VALID_RESOLVED_MODES.has(s.resolvedStoryMode as ResolvedStoryMode) &&
+    typeof s.resolvedGenre === "string" &&
     Array.isArray(s.beats) &&
     s.beats.every(isValidBeat) &&
     typeof s.platformVariants === "object" &&
@@ -63,10 +65,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const genre = getGenre(body.genre);
+  // Resolve genre before pack lookup — "auto" picks a random genre id
+  // NOTE: If seriesMode is true with genre "auto", the caller should pass the
+  // resolvedGenre from episode 1 for all subsequent episodes to keep a series
+  // in one genre. The server is stateless and cannot enforce this automatically.
+  const resolvedGenre = resolveGenre(body.genre);
+
+  const genre = getGenre(resolvedGenre);
   if (!genre) {
     return NextResponse.json(
-      { error: `Unknown genre: ${body.genre}` },
+      { error: `Unknown genre: ${resolvedGenre}` },
       { status: 400 }
     );
   }
@@ -115,10 +123,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Inject resolvedStoryMode server-side — Claude does not produce this field
-  const withMode = { ...(parsed as object), resolvedStoryMode };
+  // Inject server-resolved fields — Claude does not produce these
+  const withMeta = { ...(parsed as object), resolvedStoryMode, resolvedGenre };
 
-  if (!isValidStory(withMode)) {
+  if (!isValidStory(withMeta)) {
     return NextResponse.json(
       {
         error: "Claude response does not match GeneratedStory shape",
@@ -128,5 +136,5 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json(withMode);
+  return NextResponse.json(withMeta);
 }

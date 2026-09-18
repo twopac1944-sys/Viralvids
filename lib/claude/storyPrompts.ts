@@ -27,6 +27,38 @@ const STORY_MODE_INSTRUCTIONS: Record<ResolvedStoryMode, string> = {
   Transitions between narrator and character voice should feel seamless, not abrupt.`,
 };
 
+function feelGoodLoopMechanic(): string {
+  return `
+FEEL-GOOD LOOP MECHANIC (overrides default for this genre):
+The hook/loop ending pair works in the OPPOSITE direction from the standard mechanic.
+  - The hook should sound uncertain, incomplete, yearning, or unresolved on first hearing.
+  - The loopEnding should return to the same line or moment and make it feel earned, warm, and whole.
+  - On second listen, the hook gains emotional payoff — NOT dread, NOT irony, NOT a sinister second meaning.
+
+EXAMPLES — match this warmth-gains-depth pattern:
+  Hook:       "She hadn't called her father in three years."
+  Loop Ending: "She hadn't called her father in three years. Now she didn't have to — he was standing at her door."
+
+  Hook:       "He always kept the extra chair at the table."
+  Loop Ending: "He always kept the extra chair at the table. Tonight, for the first time, it wasn't empty."`;
+}
+
+function tensionCurveSection(isFeelGood: boolean): string {
+  if (isFeelGood) {
+    return `ENDING GUARANTEE (Feel-Good genre — replaces tension curve rule):
+  The resolution must be genuinely positive. No twist that undercuts the happy ending, no last-second dread, no ironic reversal.
+  The FALSE RELIEF BEAT RULE is SKIPPED for this genre entirely — the relief IS the real ending, not a setup for a gut-punch.
+  Every beat should move toward warmth, connection, or resolution. The emotional arc is: uncertainty → hope → earned joy.`;
+  }
+
+  return `TENSION CURVE — FALSE RELIEF BEAT (applies to stories with 5+ beats only):
+  Exactly one beat in the back half of the story (after the midpoint beat, before the final beat) must function as a FALSE RELIEF beat — a moment where the character or narration signals safety, resolution, or calm. The final beat then undercuts it.
+  - This beat's emotion tag must be "calm" or "hopeful."
+  - Its visualPrompt must reflect genuine calm: well-lit, open space, relaxed posture, soft light. Make the contrast with the final beat's visuals stark.
+  - The false relief must feel earned, not cheap — the character genuinely believes the threat is over.
+  For stories under 5 beats: skip this rule. There is not enough room for it to land without feeling rushed.`;
+}
+
 export function buildStoryPrompt(
   request: StoryRequest,
   genre: GenrePack
@@ -34,6 +66,7 @@ export function buildStoryPrompt(
   const resolvedStoryMode = resolveStoryMode(request.storyMode ?? "auto");
   const targetWords = TARGET_WORDS[request.targetLength];
   const tone = request.tone;
+  const isFeelGood = genre.id === "feel-good";
 
   const seriesSection = request.seriesMode && request.seriesContext
     ? `
@@ -60,6 +93,7 @@ STEP 1 — WRITE THE HOOK AND LOOP ENDING AS A LINKED PAIR FIRST.
   - The hook is the opening line (first ~3 seconds). It must be an immediate, irresistible entry point.
   - The loopEnding is the final line. It must recontextualize the hook — hearing it should make the viewer want to watch from the beginning again. The ending loops back to the hook emotionally or literally.
   - Design these two lines as one unit before writing anything else.
+${isFeelGood ? feelGoodLoopMechanic() : ""}
 
 STEP 2 — BUILD THE MIDDLE using this arc:
   Setup → Rising Tension → Complication → Twist → Resolution
@@ -70,12 +104,7 @@ STEP 3 — BREAK INTO 5–8 BEATS.
   Beat 1 must contain or open with the hook line.
   The final beat must end with the loopEnding line.
 
-TENSION CURVE — FALSE RELIEF BEAT (applies to stories with 5+ beats only):
-  Exactly one beat in the back half of the story (after the midpoint beat, before the final beat) must function as a FALSE RELIEF beat — a moment where the character or narration signals safety, resolution, or calm. The final beat then undercuts it.
-  - This beat's emotion tag must be "calm" or "hopeful."
-  - Its visualPrompt must reflect genuine calm: well-lit, open space, relaxed posture, soft light. Make the contrast with the final beat's visuals stark.
-  - The false relief must feel earned, not cheap — the character genuinely believes the threat is over.
-  For stories under 5 beats: skip this rule. There is not enough room for it to land without feeling rushed.
+${tensionCurveSection(isFeelGood)}
 
 STEP 4 — FOR EACH BEAT, assign:
   - narration: the spoken narration text for that beat

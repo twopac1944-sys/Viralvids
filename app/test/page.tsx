@@ -30,6 +30,7 @@ const ALL_GENRES = [
   { id: "sci-fi-serial", label: "Sci-Fi Serial" },
   { id: "motivational-redemption", label: "Motivational / Redemption" },
   { id: "dark-fairy-tale", label: "Dark Fairy Tale" },
+  { id: "feel-good", label: "Feel-Good" },
 ];
 
 const EMOTION_COLORS: Record<string, string> = {
@@ -49,8 +50,12 @@ const MODE_BADGE: Record<ResolvedStoryMode, { label: string; color: string; bg: 
   hybrid: { label: "Hybrid", color: "text-violet-300", bg: "bg-violet-950", border: "border-violet-800" },
 };
 
+const GENRE_LABEL: Record<string, string> = Object.fromEntries(
+  ALL_GENRES.map((g) => [g.id, g.label])
+);
+
 const defaultForm: StoryRequest = {
-  genre: "horror",
+  genre: "auto",
   tone: "dark",
   targetLength: "60s",
   storyMode: "auto",
@@ -156,18 +161,54 @@ function BeatList({ beats }: { beats: StoryBeat[] }) {
   );
 }
 
+function RatioBar({
+  label,
+  count,
+  total,
+  barColor,
+}: {
+  label: string;
+  count: number;
+  total: number;
+  barColor: string;
+}) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-xs text-gray-400 w-36 truncate">{label}</span>
+      <div className="flex-1 bg-gray-800 rounded-full h-1.5">
+        <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+      </div>
+      <span className="text-xs text-gray-400 w-20 text-right">
+        {count} ({pct}%)
+      </span>
+    </div>
+  );
+}
+
+// deterministic color from a string
+function genreColor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffffff;
+  const hue = h % 360;
+  return `hsl(${hue}, 65%, 55%)`;
+}
+
 export default function TestPage() {
   const [form, setForm] = useState<StoryRequest>(defaultForm);
   const [result, setResult] = useState<GeneratedStory | null>(null);
+  const [requestedGenre, setRequestedGenre] = useState<string>("auto");
   const [requestedMode, setRequestedMode] = useState<StoryMode>("auto");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("full");
+
+  // Session trackers
   const [modeCount, setModeCount] = useState<Record<ResolvedStoryMode, number>>({
-    dialogue: 0,
-    narration: 0,
-    hybrid: 0,
+    dialogue: 0, narration: 0, hybrid: 0,
   });
+  const [genreCount, setGenreCount] = useState<Record<string, number>>({});
+  const [autoGenreTotal, setAutoGenreTotal] = useState(0);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -175,6 +216,7 @@ export default function TestPage() {
     setError(null);
     setResult(null);
     setActiveTab("full");
+    const submittedGenre = form.genre;
     const submittedMode = form.storyMode;
     try {
       const res = await fetch("/api/generate-story", {
@@ -186,11 +228,19 @@ export default function TestPage() {
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       const story = data as GeneratedStory;
       setResult(story);
+      setRequestedGenre(submittedGenre);
       setRequestedMode(submittedMode);
       setModeCount((prev) => ({
         ...prev,
         [story.resolvedStoryMode]: prev[story.resolvedStoryMode] + 1,
       }));
+      if (submittedGenre === "auto") {
+        setAutoGenreTotal((n) => n + 1);
+        setGenreCount((prev) => ({
+          ...prev,
+          [story.resolvedGenre]: (prev[story.resolvedGenre] ?? 0) + 1,
+        }));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -203,10 +253,10 @@ export default function TestPage() {
       ? result.platformVariants[activeTab]
       : result?.beats ?? [];
 
-  const totalGenerated = modeCount.dialogue + modeCount.narration + modeCount.hybrid;
-  const dialoguePct = totalGenerated > 0 ? Math.round((modeCount.dialogue / totalGenerated) * 100) : 0;
-  const narrationPct = totalGenerated > 0 ? Math.round((modeCount.narration / totalGenerated) * 100) : 0;
-  const hybridPct = totalGenerated > 0 ? Math.round((modeCount.hybrid / totalGenerated) * 100) : 0;
+  const totalModeGenerated = modeCount.dialogue + modeCount.narration + modeCount.hybrid;
+
+  // Sort genre tracker by count desc
+  const sortedGenres = Object.entries(genreCount).sort((a, b) => b[1] - a[1]);
 
   return (
     <main className="min-h-screen bg-gray-950 text-gray-100 p-8 font-mono">
@@ -225,9 +275,12 @@ export default function TestPage() {
             onChange={(e) => setForm({ ...form, genre: e.target.value })}
             className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
           >
-            {ALL_GENRES.map((g) => (
-              <option key={g.id} value={g.id}>{g.label}</option>
-            ))}
+            <option value="auto">Auto (random from all genres)</option>
+            <optgroup label="──────────────">
+              {ALL_GENRES.map((g) => (
+                <option key={g.id} value={g.id}>{g.label}</option>
+              ))}
+            </optgroup>
           </select>
         </div>
 
@@ -286,6 +339,11 @@ export default function TestPage() {
 
         {form.seriesMode && (
           <div className="space-y-3">
+            {form.genre === "auto" && (
+              <p className="text-xs text-yellow-500 bg-yellow-950 border border-yellow-800 rounded px-3 py-2">
+                Series + Auto Genre: the server resolves genre independently per request. To keep a series in one genre, use the resolvedGenre from episode 1 for all subsequent episodes.
+              </p>
+            )}
             <div>
               <label className="block text-xs text-gray-400 mb-1">Episode Number</label>
               <input
@@ -321,34 +379,57 @@ export default function TestPage() {
         </button>
       </form>
 
-      {/* ── Session Mode Ratio Tracker ── */}
-      {totalGenerated > 0 && (
-        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 mb-8 max-w-lg">
-          <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">
-            Session Auto Ratio ({totalGenerated} generated)
-          </p>
-          <div className="space-y-2">
-            {(["dialogue", "narration", "hybrid"] as ResolvedStoryMode[]).map((mode) => {
-              const count = modeCount[mode];
-              const pct = mode === "dialogue" ? dialoguePct : mode === "narration" ? narrationPct : hybridPct;
-              const m = MODE_BADGE[mode];
-              return (
-                <div key={mode} className="flex items-center gap-3">
-                  <span className={`text-xs w-16 ${m.color}`}>{m.label}</span>
-                  <div className="flex-1 bg-gray-800 rounded-full h-1.5">
-                    <div
-                      className={`h-1.5 rounded-full ${m.bg} border ${m.border}`}
-                      style={{ width: `${pct}%`, backgroundColor: mode === "dialogue" ? "#92400e" : mode === "narration" ? "#0c4a6e" : "#4c1d95" }}
+      {/* ── Session Trackers ── */}
+      {(totalModeGenerated > 0 || autoGenreTotal > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 max-w-3xl">
+          {/* Story Mode Ratio */}
+          {totalModeGenerated > 0 && (
+            <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">
+                Story Mode Ratio ({totalModeGenerated} generated)
+              </p>
+              <div className="space-y-2">
+                {(["dialogue", "narration", "hybrid"] as ResolvedStoryMode[]).map((mode) => {
+                  const m = MODE_BADGE[mode];
+                  const barColors = { dialogue: "#92400e", narration: "#0c4a6e", hybrid: "#4c1d95" };
+                  return (
+                    <RatioBar
+                      key={mode}
+                      label={m.label}
+                      count={modeCount[mode]}
+                      total={totalModeGenerated}
+                      barColor={barColors[mode]}
                     />
-                  </div>
-                  <span className="text-xs text-gray-400 w-20 text-right">
-                    {count} ({pct}%)
-                  </span>
-                </div>
-              );
-            })}
-            <p className="text-xs text-gray-600 pt-1">Target: dialogue ~75% · narration ~25%</p>
-          </div>
+                  );
+                })}
+                <p className="text-xs text-gray-600 pt-1">Target: dialogue ~75% · narration ~25%</p>
+              </div>
+            </div>
+          )}
+
+          {/* Genre Distribution (auto-genre only) */}
+          {autoGenreTotal > 0 && (
+            <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">
+                Auto Genre Distribution ({autoGenreTotal} auto rolls)
+              </p>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {sortedGenres.map(([id, count]) => (
+                  <RatioBar
+                    key={id}
+                    label={GENRE_LABEL[id] ?? id}
+                    count={count}
+                    total={autoGenreTotal}
+                    barColor={genreColor(id)}
+                  />
+                ))}
+                {sortedGenres.length === 0 && (
+                  <p className="text-xs text-gray-600">No auto rolls yet</p>
+                )}
+              </div>
+              <p className="text-xs text-gray-600 pt-2">Target: ~1/{27} per genre (~3.7%)</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -364,17 +445,22 @@ export default function TestPage() {
         <div className="max-w-3xl">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-base font-semibold text-gray-200">
                 {result.beats.length} beats · {result.totalWordCount} words
               </h2>
-              {/* Resolved mode badge */}
+              {/* Genre badge */}
+              {requestedGenre === "auto" && (
+                <span className="text-xs font-medium text-lime-300 bg-lime-950 border border-lime-800 rounded px-2 py-0.5">
+                  Auto → {GENRE_LABEL[result.resolvedGenre] ?? result.resolvedGenre}
+                </span>
+              )}
+              {/* Story mode badge */}
               {(() => {
                 const m = MODE_BADGE[result.resolvedStoryMode];
-                const wasAuto = requestedMode === "auto";
                 return (
                   <span className={`text-xs font-medium ${m.color} ${m.bg} border ${m.border} rounded px-2 py-0.5`}>
-                    {wasAuto ? `Auto → ${m.label}` : m.label}
+                    {requestedMode === "auto" ? `Auto → ${m.label}` : m.label}
                   </span>
                 );
               })()}
@@ -384,7 +470,7 @@ export default function TestPage() {
             </span>
           </div>
 
-          {/* Hook + Loop Ending (canonical) */}
+          {/* Hook + Loop Ending */}
           <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 mb-4">
             <div className="mb-3">
               <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide">Hook</p>
@@ -396,7 +482,7 @@ export default function TestPage() {
             </div>
           </div>
 
-          {/* Variant integrity — side-by-side hook/loopEnding across 30s / 55s / 90s */}
+          {/* Variant integrity */}
           <VariantIntegrityPanel
             hook={result.hook}
             loopEnding={result.loopEnding}
