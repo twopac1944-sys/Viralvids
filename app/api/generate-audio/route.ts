@@ -28,8 +28,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Story has no beats" }, { status: 400 });
   }
 
+  // Separate B-roll beats (no voice) from beats that need synthesis
+  const voiceBeats = story.beats.filter(
+    (b) => b.beatType !== "broll" && b.narration && b.voiceRole
+  );
+  const skippedBeats = story.beats
+    .filter((b) => b.beatType === "broll" || !b.narration || !b.voiceRole)
+    .map((b) => ({ beatNumber: b.beatNumber, reason: "broll" as const }));
+
   const results = await Promise.allSettled(
-    story.beats.map((beat) =>
+    voiceBeats.map((beat) =>
       routeBeat(
         beat,
         beat.taggedNarration ?? beat.narration,
@@ -46,11 +54,11 @@ export async function POST(req: NextRequest) {
       audio.push(r.value);
     } else {
       errors.push({
-        beatNumber: story.beats[i].beatNumber,
+        beatNumber: voiceBeats[i].beatNumber,
         error: r.reason instanceof Error ? r.reason.message : String(r.reason),
       });
     }
   });
 
-  return NextResponse.json({ audio, errors });
+  return NextResponse.json({ audio, errors, skippedBeats });
 }

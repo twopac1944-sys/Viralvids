@@ -1,10 +1,12 @@
-export type StoryMode = "dialogue" | "narration" | "hybrid" | "auto";
-export type ResolvedStoryMode = "dialogue" | "narration" | "hybrid";
+export type StoryMode = "dialogue" | "narration" | "hybrid" | "auto" | "scripted";
+export type ResolvedStoryMode = "dialogue" | "narration" | "hybrid" | "scripted";
 
 export type VisualStyle = "photorealistic" | "stylized-illustration" | "anime" | "auto";
 export type ResolvedVisualStyle = "photorealistic" | "stylized-illustration" | "anime";
 
 export type Emotion = "tense" | "dark" | "hopeful" | "mysterious" | "urgent" | "calm" | "triumphant" | "melancholic";
+
+export type BeatType = "dialogue" | "broll";
 
 export interface StoryBeat {
   beatNumber: number;
@@ -14,6 +16,8 @@ export interface StoryBeat {
   emotion: string;
   visualPrompt: string;
   durationSec: number;
+  beatType?: BeatType;       // "dialogue" (has voice) or "broll" (wordless cutaway); scripted mode only
+  soundDesign?: string;      // ambient + diegetic audio description for this beat
 }
 
 export interface Character {
@@ -37,6 +41,7 @@ export interface GeneratedStory {
   resolvedGenre: string;
   resolvedVisualStyle: ResolvedVisualStyle;
   characters: Character[];
+  musicDirection?: string;  // story-level score description; set by scripted mode
   platformVariants: {
     tiktok30: StoryBeat[];
     shorts55: StoryBeat[];

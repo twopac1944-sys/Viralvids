@@ -25,6 +25,19 @@ const STORY_MODE_INSTRUCTIONS: Record<ResolvedStoryMode, string> = {
   Mix narrator and character beats freely — let story structure determine the balance.
   Aim for roughly half narrator, half character-voiced beats, but prioritise what serves each narrative moment.
   Transitions between narrator and character voice should feel seamless, not abrupt.`,
+
+  scripted: `STORY MODE: SCRIPTED (zero narration — pure acted dialogue + B-roll cutaways)
+  ABSOLUTE RULE: There must be zero narrator beats. Every beat is one of two types:
+  • beatType "dialogue": a character speaks — narration = the spoken line, voiceRole = "character_[Name]", durationSec = word count ÷ 2.5
+  • beatType "broll": a wordless visual cutaway — narration = "", voiceRole = "", durationSec = 3–6s (visual timing only, not word count)
+  B-ROLL PLACEMENT RULES:
+    - Beat 2 must always be a B-roll beat (establishing / world-setting before dialogue begins)
+    - Place one B-roll beat mid-story at a tension high-point (held breath before the twist)
+    - Place one B-roll beat just before the final reveal (pre-resolution pause)
+    - Total B-roll beats: exactly 2–3 in a 90s story, never consecutive
+  DIALOGUE BEATS: Characters speak in naturalistic, emotionally charged lines.
+    No "as you know Bob", no exposition dumps — action and subtext only.
+    Each character has a distinct rhythm. Short sentences under pressure; longer when confessing.`,
 };
 
 const VISUAL_STYLE_INSTRUCTIONS: Record<ResolvedVisualStyle, string> = {
@@ -88,7 +101,8 @@ export function buildStoryPrompt(
   const targetWords = TARGET_WORDS[request.targetLength];
   const tone = request.tone;
   const isFeelGood = genre.id === "feel-good";
-  const hasDialogue = resolvedStoryMode === "dialogue" || resolvedStoryMode === "hybrid";
+  const hasDialogue = resolvedStoryMode === "dialogue" || resolvedStoryMode === "hybrid" || resolvedStoryMode === "scripted";
+  const isScripted = resolvedStoryMode === "scripted";
 
   const seriesSection = request.seriesMode && request.seriesContext
     ? `
@@ -111,6 +125,15 @@ STEP 7 — BUILD THE CHARACTERS ARRAY.
   For narration-only beats: characters array is [].` : `
 STEP 7 — CHARACTERS ARRAY.
   This story uses narration mode only. Set characters to an empty array [].`;
+
+  const musicDirectionStep = isScripted ? `
+
+STEP 8 — WRITE THE musicDirection STRING.
+  Describe the full episode's score as a single paragraph (3-5 sentences) for a music composer.
+  Cover: instrumentation, tempo, key emotional register, how the tension curve maps to musical evolution, and how it should resolve at the loop ending.
+  This is a production brief, not a lyric or title. Example:
+  "Sparse solo piano in a minor key opens under the first dialogue beat, building a sense of unease. A low cello drone enters at the mid-point B-roll. Percussion arrives sparingly after the twist — a single kick drum on each cut. The music crescendos into the pre-resolution B-roll silence, then resolves to a single sustained string chord over the final beat."` : "";
+
 
   const system = `You are a master short-form storytelling engine. You write viral, emotionally gripping narratives for social video platforms (TikTok, YouTube Shorts, Instagram Reels).
 
@@ -146,11 +169,13 @@ STEP 3 — BREAK INTO 5–8 BEATS.
 ${tensionCurveSection(isFeelGood)}
 
 STEP 4 — FOR EACH BEAT, assign:
-  - narration: the spoken narration text for that beat
-  - voiceRole: "narrator" for narration; use "character_[name]" if there is dialogue from a named character
+  - narration: the spoken narration text for that beat (empty string "" for B-roll beats in scripted mode)
+  - voiceRole: "narrator" for narration; use "character_[name]" if there is dialogue from a named character; "" for B-roll beats
   - emotion: exactly one from this set: tense | dark | hopeful | mysterious | urgent | calm | triumphant | melancholic
   - visualPrompt: write in the VISUAL STYLE specified above — see style instructions for exact format and vocabulary
-  - durationSec: word count of narration ÷ 2.5, rounded to nearest integer (minimum 3)
+  - durationSec: word count of narration ÷ 2.5, rounded to nearest integer (minimum 3); B-roll beats use 3–6 based on visual pacing
+  - soundDesign: 1–2 sentences describing the ambient and diegetic audio for this beat (applies to ALL modes, ALL beats including B-roll). Describe room tone, background sounds, close sound objects, any diegetic music. Do NOT name emotions — describe sounds only. Example: "Rain against glass. Distant car alarm. The hiss of a kettle going cold."${isScripted ? `
+  - beatType: "dialogue" if a character speaks, "broll" if this is a wordless visual cutaway` : ""}
 
 VISUAL FRAMING RULE FOR DIALOGUE BEATS:
   When a beat's voiceRole is "character_[name]" (a named character is speaking), write the visualPrompt
@@ -191,7 +216,7 @@ STEP 5 — GENERATE THREE PLATFORM VARIANTS by rewriting the beat list at differ
 
 STEP 6 — COUNT total words across all main beats' narration fields.
 ${characterStep}
-
+${musicDirectionStep}
 OUTPUT FORMAT:
 Return ONLY valid JSON. No preamble. No markdown fences. No explanation. No trailing text.
 The JSON must exactly match this TypeScript type:
@@ -203,7 +228,8 @@ The JSON must exactly match this TypeScript type:
   "loopEnding": string,
   "beats": StoryBeat[],
   "totalWordCount": number,
-  "characters": Character[],
+  "characters": Character[],${isScripted ? `
+  "musicDirection": string,` : ""}
   "platformVariants": {
     "tiktok30": StoryBeat[],
     "shorts55": StoryBeat[],
@@ -218,7 +244,9 @@ Where StoryBeat is:
   "voiceRole": string,
   "emotion": "tense" | "dark" | "hopeful" | "mysterious" | "urgent" | "calm" | "triumphant" | "melancholic",
   "visualPrompt": string,
-  "durationSec": number
+  "durationSec": number,
+  "soundDesign": string${isScripted ? `,
+  "beatType": "dialogue" | "broll"` : ""}
 }
 
 Where Character is:

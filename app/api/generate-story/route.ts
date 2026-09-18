@@ -9,9 +9,9 @@ import { resolveVisualStyle } from "@/lib/genres/resolveVisualStyle";
 import { buildStoryPrompt } from "@/lib/claude/storyPrompts";
 import claudeClient from "@/lib/claude/client";
 
-const VALID_STORY_MODES = new Set(["dialogue", "narration", "hybrid", "auto"]);
+const VALID_STORY_MODES = new Set(["dialogue", "narration", "hybrid", "auto", "scripted"]);
 const VALID_VISUAL_STYLES = new Set(["photorealistic", "stylized-illustration", "anime", "auto"]);
-const VALID_RESOLVED_MODES = new Set<ResolvedStoryMode>(["dialogue", "narration", "hybrid"]);
+const VALID_RESOLVED_MODES = new Set<ResolvedStoryMode>(["dialogue", "narration", "hybrid", "scripted"]);
 const VALID_RESOLVED_STYLES = new Set<ResolvedVisualStyle>(["photorealistic", "stylized-illustration", "anime"]);
 
 function isValidBeat(b: unknown): b is StoryBeat {
@@ -24,6 +24,7 @@ function isValidBeat(b: unknown): b is StoryBeat {
     typeof beat.emotion === "string" &&
     typeof beat.visualPrompt === "string" &&
     typeof beat.durationSec === "number"
+    // beatType and soundDesign are optional (backwards compat + scripted mode only)
   );
 }
 
@@ -56,6 +57,8 @@ function isValidStory(data: unknown): data is GeneratedStory {
     s.beats.every(isValidBeat) &&
     Array.isArray(s.characters) &&
     s.characters.every(isValidCharacter) &&
+    // musicDirection is optional (scripted mode only)
+    (s.musicDirection === undefined || typeof s.musicDirection === "string") &&
     typeof s.platformVariants === "object" &&
     s.platformVariants !== null &&
     Array.isArray((s.platformVariants as Record<string, unknown>).tiktok30) &&
