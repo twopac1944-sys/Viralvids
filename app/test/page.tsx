@@ -6,6 +6,7 @@ import {
   StoryRequest, GeneratedStory, StoryBeat, Character,
   StoryMode, ResolvedStoryMode, VisualStyle, ResolvedVisualStyle,
 } from "@/lib/types/story";
+import { VOICE_REGISTRY } from "@/lib/voice/voiceRegistry";
 
 const ALL_GENRES = [
   { id: "fantasy", label: "Fantasy" },
@@ -227,6 +228,10 @@ export default function TestPage() {
   const [directedStory, setDirectedStory] = useState<GeneratedStory | null>(null);
   const [directing, setDirecting] = useState(false);
   const [directionError, setDirectionError] = useState<string | null>(null);
+  const [voiceAssignments, setVoiceAssignments] = useState<Record<string, string>>({});
+  const [audioMap, setAudioMap] = useState<Record<number, { base64: string; audioMime: string; voice: string; cleanText: string; engine: string; exaggeration?: number; cfg?: number }>>({});
+  const [synthLoading, setSynthLoading] = useState(false);
+  const [synthError, setSynthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("full");
@@ -259,6 +264,9 @@ export default function TestPage() {
       setRequestedStyle(submittedStyle);
       setDirectedStory(null);
       setDirectionError(null);
+      setAudioMap({});
+      setSynthError(null);
+      setVoiceAssignments({});
       setCharStates(story.characters.map((c) => ({ character: c, loading: false, error: null })));
       setModeCount((prev) => ({ ...prev, [story.resolvedStoryMode]: prev[story.resolvedStoryMode] + 1 }));
       if (submittedGenre === "auto") {
@@ -289,6 +297,42 @@ export default function TestPage() {
       setDirectionError(err instanceof Error ? err.message : "Direction failed");
     } finally {
       setDirecting(false);
+    }
+  }
+
+  async function handleAudio() {
+    const source = directedStory ?? result;
+    if (!source) return;
+    setSynthLoading(true);
+    setSynthError(null);
+    try {
+      const res = await fetch("/api/generate-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ story: source, voiceAssignments }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      const map: Record<number, { base64: string; audioMime: string; voice: string; cleanText: string; engine: string; exaggeration?: number; cfg?: number }> = {};
+      for (const item of data.audio) {
+        map[item.beatNumber] = {
+          base64: item.audioBase64,
+          audioMime: item.audioMime ?? "audio/mp3",
+          voice: item.voice,
+          cleanText: item.cleanText,
+          engine: item.engine ?? "grok",
+          exaggeration: item.exaggeration,
+          cfg: item.cfg,
+        };
+      }
+      setAudioMap(map);
+      if (data.errors?.length) {
+        setSynthError(`${data.errors.length} beat(s) failed: ${data.errors.map((e: { beatNumber: number; error: string }) => `#${e.beatNumber} ${e.error}`).join("; ")}`);
+      }
+    } catch (err) {
+      setSynthError(err instanceof Error ? err.message : "Audio generation failed");
+    } finally {
+      setSynthLoading(false);
     }
   }
 
@@ -504,6 +548,45 @@ export default function TestPage() {
             </div>
           )}
 
+          {/* Voice Assignment */}
+          {charStates.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Voice Assignment — Chatterbox</p>
+              <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-3">
+                <p className="text-xs text-gray-600">Assign a Chatterbox cloned voice per character. Unassigned characters use Grok TTS.</p>
+                {charStates.map((cs) => {
+                  const charName = cs.character.name;
+                  const assigned = voiceAssignments[charName] ?? "";
+                  return (
+                    <div key={charName} className="flex items-center gap-3">
+                      <span className="text-xs text-white w-28 truncate shrink-0">{charName}</span>
+                      <select
+                        value={assigned}
+                        onChange={(e) => setVoiceAssignments((prev) => ({ ...prev, [charName]: e.target.value }))}
+                        className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-white text-xs focus:outline-none focus:border-violet-500"
+                      >
+                        <option value="">Default (Grok TTS)</option>
+                        <optgroup label="Female">
+                          {VOICE_REGISTRY.filter((v) => v.gender === "Female").map((v) => (
+                            <option key={v.id} value={v.id}>{v.label}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Male">
+                          {VOICE_REGISTRY.filter((v) => v.gender === "Male").map((v) => (
+                            <option key={v.id} value={v.id}>{v.label}</option>
+                          ))}
+                        </optgroup>
+                      </select>
+                      {assigned && (
+                        <span className="text-xs text-violet-400 bg-violet-950 border border-violet-800 rounded px-1.5 py-0.5 whitespace-nowrap">CB</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Variant integrity */}
           <VariantIntegrityPanel hook={result.hook} loopEnding={result.loopEnding} variants={result.platformVariants} />
 
@@ -565,6 +648,62 @@ export default function TestPage() {
                           <p className="text-sm text-emerald-200 leading-relaxed font-medium">{beat.taggedNarration ?? beat.narration}</p>
                         </div>
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Audio Generation */}
+          <div className="mb-4">
+            <div className="flex items-center gap-3 mb-3">
+              <button
+                onClick={handleAudio}
+                disabled={synthLoading || !result}
+                className="bg-violet-700 hover:bg-violet-600 disabled:opacity-50 text-white rounded px-4 py-2 text-sm font-semibold transition-colors"
+              >
+                {synthLoading ? "Synthesizing…" : Object.keys(audioMap).length > 0 ? "Re-synthesize Audio" : "Synthesize Audio"}
+              </button>
+              {Object.keys(audioMap).length > 0 && (
+                <span className="text-xs text-violet-400 bg-violet-950 border border-violet-800 rounded px-2 py-0.5">
+                  ✓ {Object.keys(audioMap).length} beats synthesized
+                </span>
+              )}
+              {!directedStory && result && (
+                <span className="text-xs text-gray-500">Run direction pass first for tagged narration</span>
+              )}
+            </div>
+            {synthError && (
+              <div className="bg-red-950 border border-red-800 rounded p-3 text-xs text-red-300 mb-3">{synthError}</div>
+            )}
+            {Object.keys(audioMap).length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Beat Audio</p>
+                {(directedStory ?? result)!.beats.map((beat) => {
+                  const a = audioMap[beat.beatNumber];
+                  if (!a) return null;
+                  const src = `data:${a.audioMime};base64,${a.base64}`;
+                  const isChatterbox = a.engine === "chatterbox";
+                  return (
+                    <div key={beat.beatNumber} className={`bg-gray-900 border rounded-lg p-4 ${isChatterbox ? "border-violet-700" : "border-violet-900"}`}>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-2">
+                        <span className="text-gray-500">#{beat.beatNumber}</span>
+                        <span className={EMOTION_COLORS[beat.emotion] ?? "text-gray-400"}>{beat.emotion}</span>
+                        <span className="text-blue-400">{beat.voiceRole}</span>
+                        <span className="text-violet-400">voice: {a.voice}</span>
+                        {isChatterbox ? (
+                          <span className="font-semibold text-violet-300 bg-violet-900 border border-violet-700 rounded px-1.5 py-0 leading-5">Chatterbox</span>
+                        ) : (
+                          <span className="font-semibold text-sky-300 bg-sky-900 border border-sky-700 rounded px-1.5 py-0 leading-5">Grok TTS</span>
+                        )}
+                        {isChatterbox && a.exaggeration !== undefined && (
+                          <span className="text-gray-500">exag: {a.exaggeration} · cfg: {a.cfg}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 mb-2 leading-relaxed">{a.cleanText}</p>
+                      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                      <audio controls src={src} className="w-full h-8" />
                     </div>
                   );
                 })}
