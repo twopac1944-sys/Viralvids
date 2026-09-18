@@ -21,6 +21,9 @@ export async function synthesizeChatterbox(
   if (!apiKey) throw new Error("FAL_API_KEY not configured");
 
   const seed = Math.floor(Math.random() * 2_147_483_647);
+  // fal.ai enforces exaggeration ≤ 1.0 and cfg ∈ [0,1]
+  const clampedExaggeration = Math.min(1.0, Math.max(0, exaggeration));
+  const clampedCfg = Math.min(1.0, Math.max(0, cfg));
 
   const res = await fetch(FAL_DIRECT_URL, {
     method: "POST",
@@ -31,8 +34,8 @@ export async function synthesizeChatterbox(
     body: JSON.stringify({
       text,
       seed,
-      exaggeration,
-      cfg,
+      exaggeration: clampedExaggeration,
+      cfg: clampedCfg,
       temperature,
       audio_url: referenceAudioUrl,
     }),
