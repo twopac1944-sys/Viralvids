@@ -4,9 +4,12 @@ export type ResolvedStoryMode = "dialogue" | "narration" | "hybrid";
 export type VisualStyle = "photorealistic" | "stylized-illustration" | "anime" | "auto";
 export type ResolvedVisualStyle = "photorealistic" | "stylized-illustration" | "anime";
 
+export type Emotion = "tense" | "dark" | "hopeful" | "mysterious" | "urgent" | "calm" | "triumphant" | "melancholic";
+
 export interface StoryBeat {
   beatNumber: number;
   narration: string;
+  taggedNarration?: string;  // populated by /api/generate-direction; narration stays clean source of truth
   voiceRole: string;
   emotion: string;
   visualPrompt: string;
@@ -46,7 +49,7 @@ export interface StoryRequest {
   tone: "dark" | "neutral" | "uplifting";
   targetLength: "30s" | "60s" | "90s" | "3min";
   storyMode: StoryMode;
-  visualStyle: VisualStyle;  // default: "photorealistic" for explicit choice; "auto" for genre-matched
+  visualStyle: VisualStyle;
   seriesMode: boolean;
   episodeNumber?: number;
   seriesContext?: string;

@@ -224,6 +224,9 @@ export default function TestPage() {
   const [requestedGenre, setRequestedGenre] = useState<string>("auto");
   const [requestedMode, setRequestedMode] = useState<StoryMode>("auto");
   const [requestedStyle, setRequestedStyle] = useState<VisualStyle>("auto");
+  const [directedStory, setDirectedStory] = useState<GeneratedStory | null>(null);
+  const [directing, setDirecting] = useState(false);
+  const [directionError, setDirectionError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("full");
@@ -254,6 +257,8 @@ export default function TestPage() {
       setRequestedGenre(submittedGenre);
       setRequestedMode(submittedMode);
       setRequestedStyle(submittedStyle);
+      setDirectedStory(null);
+      setDirectionError(null);
       setCharStates(story.characters.map((c) => ({ character: c, loading: false, error: null })));
       setModeCount((prev) => ({ ...prev, [story.resolvedStoryMode]: prev[story.resolvedStoryMode] + 1 }));
       if (submittedGenre === "auto") {
@@ -264,6 +269,26 @@ export default function TestPage() {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDirection() {
+    if (!result) return;
+    setDirecting(true);
+    setDirectionError(null);
+    try {
+      const res = await fetch("/api/generate-direction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setDirectedStory(data as GeneratedStory);
+    } catch (err) {
+      setDirectionError(err instanceof Error ? err.message : "Direction failed");
+    } finally {
+      setDirecting(false);
     }
   }
 
@@ -496,6 +521,55 @@ export default function TestPage() {
           {/* Beats */}
           <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 mb-4">
             <BeatList beats={activeBeats} />
+          </div>
+
+          {/* Voice Direction */}
+          <div className="mb-4">
+            <div className="flex items-center gap-3 mb-3">
+              <button
+                onClick={handleDirection}
+                disabled={directing || !result}
+                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white rounded px-4 py-2 text-sm font-semibold transition-colors"
+              >
+                {directing ? "Generating Voice Direction…" : directedStory ? "Regenerate Voice Direction" : "Generate Voice Direction"}
+              </button>
+              {directedStory && (
+                <span className="text-xs text-emerald-400 bg-emerald-950 border border-emerald-800 rounded px-2 py-0.5">✓ Direction complete</span>
+              )}
+            </div>
+            {directionError && (
+              <div className="bg-red-950 border border-red-800 rounded p-3 text-xs text-red-300 mb-3">{directionError}</div>
+            )}
+            {directedStory && (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Narration vs Tagged Narration</p>
+                {directedStory.beats.map((beat) => {
+                  const char = result?.characters.find((c) => c.voiceRole === beat.voiceRole);
+                  return (
+                    <div key={beat.beatNumber} className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-3">
+                        <span className="text-gray-500">#{beat.beatNumber}</span>
+                        <span className={EMOTION_COLORS[beat.emotion] ?? "text-gray-400"}>{beat.emotion}</span>
+                        <span className="text-blue-400">{beat.voiceRole}</span>
+                        {char && (
+                          <span className="text-amber-400 italic">voice: {char.voiceNotes}</span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Clean</p>
+                          <p className="text-sm text-gray-300 leading-relaxed">{beat.narration}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-emerald-600 uppercase tracking-wide mb-1">Tagged</p>
+                          <p className="text-sm text-emerald-200 leading-relaxed font-medium">{beat.taggedNarration ?? beat.narration}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Raw JSON */}
