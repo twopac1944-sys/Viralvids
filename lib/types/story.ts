@@ -1,26 +1,24 @@
 export type StoryMode = "dialogue" | "narration" | "hybrid" | "auto";
 export type ResolvedStoryMode = "dialogue" | "narration" | "hybrid";
 
+export type VisualStyle = "photorealistic" | "stylized-illustration" | "anime" | "auto";
+export type ResolvedVisualStyle = "photorealistic" | "stylized-illustration" | "anime";
+
 export interface StoryBeat {
   beatNumber: number;
   narration: string;
-  voiceRole: string;       // "narrator" or "character_[name]"
+  voiceRole: string;
   emotion: string;
   visualPrompt: string;
   durationSec: number;
 }
 
-/**
- * A named character extracted from the story.
- * referenceImageUrl / referenceGeneratedAt are populated by the
- * /api/generate-character-sheet route, not by Claude.
- */
 export interface Character {
   name: string;
-  voiceRole: string;           // matches beat voiceRole, e.g. "character_Elena"
-  physicalDescription: string; // full visual description for image generation
-  lockedTraits: string[];      // 2-3 hard identifying details extracted from physicalDescription
-  voiceNotes: string;          // how this character speaks (cadence, vocabulary, register)
+  voiceRole: string;
+  physicalDescription: string;
+  lockedTraits: string[];
+  voiceNotes: string;
   referenceImageUrl: string | null;
   referenceGeneratedAt: string | null;
 }
@@ -34,7 +32,8 @@ export interface GeneratedStory {
   totalWordCount: number;
   resolvedStoryMode: ResolvedStoryMode;
   resolvedGenre: string;
-  characters: Character[];     // populated for dialogue/hybrid; empty array for narration
+  resolvedVisualStyle: ResolvedVisualStyle;
+  characters: Character[];
   platformVariants: {
     tiktok30: StoryBeat[];
     shorts55: StoryBeat[];
@@ -43,10 +42,11 @@ export interface GeneratedStory {
 }
 
 export interface StoryRequest {
-  genre: string;             // specific genre id OR "auto"
+  genre: string;
   tone: "dark" | "neutral" | "uplifting";
   targetLength: "30s" | "60s" | "90s" | "3min";
   storyMode: StoryMode;
+  visualStyle: VisualStyle;  // default: "photorealistic" for explicit choice; "auto" for genre-matched
   seriesMode: boolean;
   episodeNumber?: number;
   seriesContext?: string;

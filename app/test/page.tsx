@@ -3,12 +3,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import {
-  StoryRequest,
-  GeneratedStory,
-  StoryBeat,
-  Character,
-  StoryMode,
-  ResolvedStoryMode,
+  StoryRequest, GeneratedStory, StoryBeat, Character,
+  StoryMode, ResolvedStoryMode, VisualStyle, ResolvedVisualStyle,
 } from "@/lib/types/story";
 
 const ALL_GENRES = [
@@ -42,34 +38,31 @@ const ALL_GENRES = [
 ];
 
 const EMOTION_COLORS: Record<string, string> = {
-  tense: "text-orange-400",
-  dark: "text-red-400",
-  hopeful: "text-green-400",
-  mysterious: "text-purple-400",
-  urgent: "text-yellow-400",
-  calm: "text-sky-400",
-  triumphant: "text-emerald-400",
-  melancholic: "text-blue-400",
+  tense: "text-orange-400", dark: "text-red-400", hopeful: "text-green-400",
+  mysterious: "text-purple-400", urgent: "text-yellow-400", calm: "text-sky-400",
+  triumphant: "text-emerald-400", melancholic: "text-blue-400",
 };
 
-const MODE_BADGE: Record<
-  ResolvedStoryMode,
-  { label: string; color: string; bg: string; border: string }
-> = {
+const MODE_BADGE: Record<ResolvedStoryMode, { label: string; color: string; bg: string; border: string }> = {
   dialogue: { label: "Dialogue", color: "text-amber-300", bg: "bg-amber-950", border: "border-amber-800" },
   narration: { label: "Narration", color: "text-sky-300", bg: "bg-sky-950", border: "border-sky-800" },
   hybrid: { label: "Hybrid", color: "text-violet-300", bg: "bg-violet-950", border: "border-violet-800" },
 };
 
-const GENRE_LABEL: Record<string, string> = Object.fromEntries(
-  ALL_GENRES.map((g) => [g.id, g.label])
-);
+const STYLE_BADGE: Record<ResolvedVisualStyle, { label: string; color: string; bg: string; border: string }> = {
+  "photorealistic":        { label: "Photorealistic",        color: "text-cyan-300",   bg: "bg-cyan-950",   border: "border-cyan-800" },
+  "stylized-illustration": { label: "Stylized Illustration", color: "text-rose-300",   bg: "bg-rose-950",   border: "border-rose-800" },
+  "anime":                 { label: "Anime",                 color: "text-fuchsia-300",bg: "bg-fuchsia-950",border: "border-fuchsia-800" },
+};
+
+const GENRE_LABEL: Record<string, string> = Object.fromEntries(ALL_GENRES.map((g) => [g.id, g.label]));
 
 const defaultForm: StoryRequest = {
-  genre: "feel-good",
-  tone: "uplifting",
+  genre: "auto",
+  tone: "dark",
   targetLength: "60s",
-  storyMode: "dialogue",
+  storyMode: "auto",
+  visualStyle: "auto",
   seriesMode: false,
 };
 
@@ -90,53 +83,37 @@ const VARIANT_META = [
 
 function MatchBadge({ matches }: { matches: boolean }) {
   return matches ? (
-    <span className="text-xs font-medium text-emerald-400 bg-emerald-950 border border-emerald-800 rounded px-1.5 py-0.5">
-      ✓ match
-    </span>
+    <span className="text-xs font-medium text-emerald-400 bg-emerald-950 border border-emerald-800 rounded px-1.5 py-0.5">✓ match</span>
   ) : (
-    <span className="text-xs font-medium text-red-400 bg-red-950 border border-red-800 rounded px-1.5 py-0.5">
-      ✗ mismatch
-    </span>
+    <span className="text-xs font-medium text-red-400 bg-red-950 border border-red-800 rounded px-1.5 py-0.5">✗ mismatch</span>
   );
 }
 
-function VariantIntegrityPanel({
-  hook,
-  loopEnding,
-  variants,
-}: {
-  hook: string;
-  loopEnding: string;
-  variants: GeneratedStory["platformVariants"];
-}) {
+function VariantIntegrityPanel({ hook, loopEnding, variants }: { hook: string; loopEnding: string; variants: GeneratedStory["platformVariants"] }) {
   return (
     <div className="mb-4">
-      <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
-        Hook / Loop Ending — Variant Integrity Check
-      </p>
+      <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Hook / Loop Ending — Variant Integrity Check</p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {VARIANT_META.map(({ key, label, color, border }) => {
           const beats = variants[key];
-          const firstNarration = beats[0]?.narration ?? "";
-          const lastNarration = beats[beats.length - 1]?.narration ?? "";
-          const hookMatches = firstNarration === hook || firstNarration.startsWith(hook);
-          const endingMatches = lastNarration === loopEnding || lastNarration.endsWith(loopEnding);
+          const first = beats[0]?.narration ?? "";
+          const last = beats[beats.length - 1]?.narration ?? "";
           return (
             <div key={key} className={`bg-gray-900 border ${border} rounded-lg p-3`}>
               <p className={`text-xs font-semibold mb-3 ${color}`}>{label}</p>
               <div className="mb-3">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs text-gray-500 uppercase tracking-wide">Hook</span>
-                  <MatchBadge matches={hookMatches} />
+                  <MatchBadge matches={first === hook || first.startsWith(hook)} />
                 </div>
-                <p className="text-xs text-gray-300 leading-relaxed">{firstNarration}</p>
+                <p className="text-xs text-gray-300 leading-relaxed">{first}</p>
               </div>
               <div className="border-t border-gray-800 pt-2">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs text-gray-500 uppercase tracking-wide">Loop Ending</span>
-                  <MatchBadge matches={endingMatches} />
+                  <MatchBadge matches={last === loopEnding || last.endsWith(loopEnding)} />
                 </div>
-                <p className="text-xs text-gray-300 leading-relaxed">{lastNarration}</p>
+                <p className="text-xs text-gray-300 leading-relaxed">{last}</p>
               </div>
             </div>
           );
@@ -151,9 +128,7 @@ function BeatList({ beats }: { beats: StoryBeat[] }) {
   const totalWords = beats.reduce((s, b) => s + b.narration.split(" ").length, 0);
   return (
     <div>
-      <p className="text-xs text-gray-500 mb-3">
-        {beats.length} beats · {totalWords} words · ~{totalSec}s
-      </p>
+      <p className="text-xs text-gray-500 mb-3">{beats.length} beats · {totalWords} words · ~{totalSec}s</p>
       <div className="space-y-4">
         {beats.map((beat) => (
           <div key={beat.beatNumber} className="border-l-2 border-gray-700 pl-4">
@@ -191,24 +166,11 @@ function genreColor(id: string): string {
   return `hsl(${h % 360}, 65%, 55%)`;
 }
 
-// ── Character card ──────────────────────────────────────────────────────────
+type CharState = { character: Character; loading: boolean; error: string | null };
 
-type CharState = {
-  character: Character;
-  loading: boolean;
-  error: string | null;
-};
-
-function CharacterCard({
-  charState,
-  onGenerate,
-}: {
-  charState: CharState;
-  onGenerate: () => void;
-}) {
+function CharacterCard({ charState, onGenerate }: { charState: CharState; onGenerate: () => void }) {
   const { character, loading, error } = charState;
   const hasImage = !!character.referenceImageUrl;
-
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -217,95 +179,55 @@ function CharacterCard({
           <p className="text-xs text-blue-400">{character.voiceRole}</p>
         </div>
         {hasImage ? (
-          <span className="text-xs font-medium text-emerald-400 bg-emerald-950 border border-emerald-800 rounded px-2 py-0.5 whitespace-nowrap">
-            ✓ Reference locked
-          </span>
+          <span className="text-xs font-medium text-emerald-400 bg-emerald-950 border border-emerald-800 rounded px-2 py-0.5 whitespace-nowrap">✓ Reference locked</span>
         ) : (
-          <button
-            onClick={onGenerate}
-            disabled={loading}
-            className="text-xs bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white rounded px-3 py-1 whitespace-nowrap transition-colors"
-          >
+          <button onClick={onGenerate} disabled={loading}
+            className="text-xs bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white rounded px-3 py-1 whitespace-nowrap transition-colors">
             {loading ? "Generating…" : "Generate Reference Sheet"}
           </button>
         )}
       </div>
-
-      {/* Image or placeholder */}
       {hasImage && character.referenceImageUrl ? (
         <div className="mb-3 relative w-full aspect-[3/4] rounded overflow-hidden">
-          <Image
-            src={character.referenceImageUrl}
-            alt={`Reference sheet for ${character.name}`}
-            fill
-            className="object-cover"
-            unoptimized
-          />
+          <Image src={character.referenceImageUrl} alt={`Reference sheet for ${character.name}`} fill className="object-cover" unoptimized />
         </div>
       ) : loading ? (
         <div className="mb-3 w-full aspect-[3/4] rounded bg-gray-800 flex items-center justify-center">
-          <div className="text-xs text-gray-500 text-center px-4">
-            <div className="animate-pulse mb-2">◌</div>
-            Polling WaveSpeed…
-          </div>
+          <div className="text-xs text-gray-500 text-center px-4"><div className="animate-pulse mb-2">◌</div>Polling WaveSpeed…</div>
         </div>
       ) : null}
-
-      {/* Error */}
       {error && (
         <div className="mb-3 bg-red-950 border border-red-800 rounded p-2 text-xs text-red-300">
-          {error}
-          <button
-            onClick={onGenerate}
-            className="ml-2 underline hover:no-underline"
-          >
-            Retry
-          </button>
+          {error}<button onClick={onGenerate} className="ml-2 underline hover:no-underline">Retry</button>
         </div>
       )}
-
-      {/* Physical description + locked traits */}
-      <p className="text-xs text-gray-400 leading-relaxed mb-2">
-        {character.physicalDescription}
-      </p>
+      <p className="text-xs text-gray-400 leading-relaxed mb-2">{character.physicalDescription}</p>
       {character.lockedTraits.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
           {character.lockedTraits.map((t) => (
-            <span
-              key={t}
-              className="text-xs bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 text-gray-300"
-            >
-              {t}
-            </span>
+            <span key={t} className="text-xs bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 text-gray-300">{t}</span>
           ))}
         </div>
       )}
       <p className="text-xs text-gray-600 italic">{character.voiceNotes}</p>
-
-      {/* Generated at timestamp */}
       {character.referenceGeneratedAt && (
-        <p className="text-xs text-gray-600 mt-2">
-          Generated {new Date(character.referenceGeneratedAt).toLocaleTimeString()}
-        </p>
+        <p className="text-xs text-gray-600 mt-2">Generated {new Date(character.referenceGeneratedAt).toLocaleTimeString()}</p>
       )}
     </div>
   );
 }
 
-// ── Main page ────────────────────────────────────────────────────────────────
-
 export default function TestPage() {
   const [form, setForm] = useState<StoryRequest>(defaultForm);
   const [result, setResult] = useState<GeneratedStory | null>(null);
   const [charStates, setCharStates] = useState<CharState[]>([]);
-  const [requestedGenre, setRequestedGenre] = useState<string>("feel-good");
-  const [requestedMode, setRequestedMode] = useState<StoryMode>("dialogue");
+  const [requestedGenre, setRequestedGenre] = useState<string>("auto");
+  const [requestedMode, setRequestedMode] = useState<StoryMode>("auto");
+  const [requestedStyle, setRequestedStyle] = useState<VisualStyle>("auto");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("full");
-  const [modeCount, setModeCount] = useState<Record<ResolvedStoryMode, number>>({
-    dialogue: 0, narration: 0, hybrid: 0,
-  });
+  const [modeCount, setModeCount] = useState<Record<ResolvedStoryMode, number>>({ dialogue: 0, narration: 0, hybrid: 0 });
   const [genreCount, setGenreCount] = useState<Record<string, number>>({});
   const [autoGenreTotal, setAutoGenreTotal] = useState(0);
 
@@ -318,6 +240,7 @@ export default function TestPage() {
     setActiveTab("full");
     const submittedGenre = form.genre;
     const submittedMode = form.storyMode;
+    const submittedStyle = form.visualStyle;
     try {
       const res = await fetch("/api/generate-story", {
         method: "POST",
@@ -330,19 +253,12 @@ export default function TestPage() {
       setResult(story);
       setRequestedGenre(submittedGenre);
       setRequestedMode(submittedMode);
-      setCharStates(
-        story.characters.map((c) => ({ character: c, loading: false, error: null }))
-      );
-      setModeCount((prev) => ({
-        ...prev,
-        [story.resolvedStoryMode]: prev[story.resolvedStoryMode] + 1,
-      }));
+      setRequestedStyle(submittedStyle);
+      setCharStates(story.characters.map((c) => ({ character: c, loading: false, error: null })));
+      setModeCount((prev) => ({ ...prev, [story.resolvedStoryMode]: prev[story.resolvedStoryMode] + 1 }));
       if (submittedGenre === "auto") {
         setAutoGenreTotal((n) => n + 1);
-        setGenreCount((prev) => ({
-          ...prev,
-          [story.resolvedGenre]: (prev[story.resolvedGenre] ?? 0) + 1,
-        }));
+        setGenreCount((prev) => ({ ...prev, [story.resolvedGenre]: (prev[story.resolvedGenre] ?? 0) + 1 }));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -353,9 +269,7 @@ export default function TestPage() {
 
   async function handleGenerateSheet(index: number) {
     const charState = charStates[index];
-    setCharStates((prev) =>
-      prev.map((cs, i) => (i === index ? { ...cs, loading: true, error: null } : cs))
-    );
+    setCharStates((prev) => prev.map((cs, i) => i === index ? { ...cs, loading: true, error: null } : cs));
     try {
       const res = await fetch("/api/generate-character-sheet", {
         method: "POST",
@@ -364,26 +278,14 @@ export default function TestPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setCharStates((prev) =>
-        prev.map((cs, i) =>
-          i === index
-            ? { character: data.character as Character, loading: false, error: null }
-            : cs
-        )
-      );
+      setCharStates((prev) => prev.map((cs, i) => i === index ? { character: data.character as Character, loading: false, error: null } : cs));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Generation failed";
-      setCharStates((prev) =>
-        prev.map((cs, i) => (i === index ? { ...cs, loading: false, error: msg } : cs))
-      );
+      setCharStates((prev) => prev.map((cs, i) => i === index ? { ...cs, loading: false, error: msg } : cs));
     }
   }
 
-  const activeBeats =
-    result && activeTab !== "full"
-      ? result.platformVariants[activeTab]
-      : result?.beats ?? [];
-
+  const activeBeats = result && activeTab !== "full" ? result.platformVariants[activeTab] : result?.beats ?? [];
   const totalModeGenerated = modeCount.dialogue + modeCount.narration + modeCount.hybrid;
   const sortedGenres = Object.entries(genreCount).sort((a, b) => b[1] - a[1]);
 
@@ -396,16 +298,11 @@ export default function TestPage() {
       <form onSubmit={handleSubmit} className="bg-gray-900 border border-gray-800 rounded-lg p-6 mb-8 space-y-4 max-w-lg">
         <div>
           <label className="block text-xs text-gray-400 mb-1">Genre</label>
-          <select
-            value={form.genre}
-            onChange={(e) => setForm({ ...form, genre: e.target.value })}
-            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
-          >
+          <select value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })}
+            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500">
             <option value="auto">Auto (random from all genres)</option>
             <optgroup label="──────────────">
-              {ALL_GENRES.map((g) => (
-                <option key={g.id} value={g.id}>{g.label}</option>
-              ))}
+              {ALL_GENRES.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
             </optgroup>
           </select>
         </div>
@@ -413,11 +310,8 @@ export default function TestPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs text-gray-400 mb-1">Tone</label>
-            <select
-              value={form.tone}
-              onChange={(e) => setForm({ ...form, tone: e.target.value as StoryRequest["tone"] })}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
-            >
+            <select value={form.tone} onChange={(e) => setForm({ ...form, tone: e.target.value as StoryRequest["tone"] })}
+              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500">
               <option value="dark">Dark</option>
               <option value="neutral">Neutral</option>
               <option value="uplifting">Uplifting</option>
@@ -425,11 +319,8 @@ export default function TestPage() {
           </div>
           <div>
             <label className="block text-xs text-gray-400 mb-1">Length</label>
-            <select
-              value={form.targetLength}
-              onChange={(e) => setForm({ ...form, targetLength: e.target.value as StoryRequest["targetLength"] })}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
-            >
+            <select value={form.targetLength} onChange={(e) => setForm({ ...form, targetLength: e.target.value as StoryRequest["targetLength"] })}
+              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500">
               <option value="30s">30 seconds</option>
               <option value="60s">60 seconds</option>
               <option value="90s">90 seconds</option>
@@ -438,18 +329,27 @@ export default function TestPage() {
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Story Mode</label>
-          <select
-            value={form.storyMode}
-            onChange={(e) => setForm({ ...form, storyMode: e.target.value as StoryMode })}
-            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
-          >
-            <option value="auto">Auto (75% dialogue / 25% narration)</option>
-            <option value="dialogue">Dialogue</option>
-            <option value="narration">Narration</option>
-            <option value="hybrid">Hybrid</option>
-          </select>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Story Mode</label>
+            <select value={form.storyMode} onChange={(e) => setForm({ ...form, storyMode: e.target.value as StoryMode })}
+              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500">
+              <option value="auto">Auto (75/25)</option>
+              <option value="dialogue">Dialogue</option>
+              <option value="narration">Narration</option>
+              <option value="hybrid">Hybrid</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Visual Style</label>
+            <select value={form.visualStyle} onChange={(e) => setForm({ ...form, visualStyle: e.target.value as VisualStyle })}
+              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500">
+              <option value="auto">Auto (genre-matched)</option>
+              <option value="photorealistic">Photorealistic</option>
+              <option value="stylized-illustration">Stylized Illustration</option>
+              <option value="anime">Anime</option>
+            </select>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -494,31 +394,22 @@ export default function TestPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 max-w-3xl">
           {totalModeGenerated > 0 && (
             <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">
-                Story Mode Ratio ({totalModeGenerated} generated)
-              </p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">Story Mode Ratio ({totalModeGenerated})</p>
               <div className="space-y-2">
-                {(["dialogue", "narration", "hybrid"] as ResolvedStoryMode[]).map((mode) => {
-                  const barColors = { dialogue: "#92400e", narration: "#0c4a6e", hybrid: "#4c1d95" };
-                  return (
-                    <RatioBar key={mode} label={MODE_BADGE[mode].label}
-                      count={modeCount[mode]} total={totalModeGenerated}
-                      barColor={barColors[mode]} />
-                  );
-                })}
+                {(["dialogue", "narration", "hybrid"] as ResolvedStoryMode[]).map((mode) => (
+                  <RatioBar key={mode} label={MODE_BADGE[mode].label} count={modeCount[mode]}
+                    total={totalModeGenerated} barColor={{ dialogue: "#92400e", narration: "#0c4a6e", hybrid: "#4c1d95" }[mode]} />
+                ))}
                 <p className="text-xs text-gray-600 pt-1">Target: dialogue ~75% · narration ~25%</p>
               </div>
             </div>
           )}
           {autoGenreTotal > 0 && (
             <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">
-                Auto Genre Distribution ({autoGenreTotal} auto rolls)
-              </p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">Auto Genre Distribution ({autoGenreTotal})</p>
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
                 {sortedGenres.map(([id, count]) => (
-                  <RatioBar key={id} label={GENRE_LABEL[id] ?? id}
-                    count={count} total={autoGenreTotal} barColor={genreColor(id)} />
+                  <RatioBar key={id} label={GENRE_LABEL[id] ?? id} count={count} total={autoGenreTotal} barColor={genreColor(id)} />
                 ))}
               </div>
               <p className="text-xs text-gray-600 pt-2">Target: ~1/27 per genre (~3.7%)</p>
@@ -529,20 +420,16 @@ export default function TestPage() {
 
       {/* ── Error ── */}
       {error && (
-        <div className="bg-red-900/40 border border-red-700 rounded p-4 mb-6 text-red-300 text-sm max-w-lg">
-          {error}
-        </div>
+        <div className="bg-red-900/40 border border-red-700 rounded p-4 mb-6 text-red-300 text-sm max-w-lg">{error}</div>
       )}
 
       {/* ── Result ── */}
       {result && (
         <div className="max-w-3xl">
-          {/* Header */}
+          {/* Header badges */}
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base font-semibold text-gray-200">
-                {result.beats.length} beats · {result.totalWordCount} words
-              </h2>
+              <h2 className="text-base font-semibold text-gray-200">{result.beats.length} beats · {result.totalWordCount} words</h2>
               {requestedGenre === "auto" && (
                 <span className="text-xs font-medium text-lime-300 bg-lime-950 border border-lime-800 rounded px-2 py-0.5">
                   Auto → {GENRE_LABEL[result.resolvedGenre] ?? result.resolvedGenre}
@@ -556,10 +443,16 @@ export default function TestPage() {
                   </span>
                 );
               })()}
+              {(() => {
+                const s = STYLE_BADGE[result.resolvedVisualStyle];
+                return (
+                  <span className={`text-xs font-medium ${s.color} ${s.bg} border ${s.border} rounded px-2 py-0.5`}>
+                    {requestedStyle === "auto" ? `Auto → ${s.label}` : s.label}
+                  </span>
+                );
+              })()}
             </div>
-            <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">
-              {result.genre} / {result.tone}
-            </span>
+            <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">{result.genre} / {result.tone}</span>
           </div>
 
           {/* Hook + Loop Ending */}
@@ -577,39 +470,25 @@ export default function TestPage() {
           {/* Characters */}
           {charStates.length > 0 && (
             <div className="mb-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
-                Characters — Reference Sheets
-              </p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Characters — Reference Sheets</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {charStates.map((cs, i) => (
-                  <CharacterCard
-                    key={cs.character.voiceRole}
-                    charState={cs}
-                    onGenerate={() => handleGenerateSheet(i)}
-                  />
+                  <CharacterCard key={cs.character.voiceRole} charState={cs} onGenerate={() => handleGenerateSheet(i)} />
                 ))}
               </div>
             </div>
           )}
 
           {/* Variant integrity */}
-          <VariantIntegrityPanel
-            hook={result.hook}
-            loopEnding={result.loopEnding}
-            variants={result.platformVariants}
-          />
+          <VariantIntegrityPanel hook={result.hook} loopEnding={result.loopEnding} variants={result.platformVariants} />
 
           {/* Platform tabs */}
           <div className="flex gap-1 mb-4 bg-gray-900 border border-gray-800 rounded-lg p-1">
             {TAB_META.map((t) => (
               <button key={t.id} onClick={() => setActiveTab(t.id)}
-                className={`flex-1 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                  activeTab === t.id ? "bg-gray-700 " + t.color : "text-gray-500 hover:text-gray-300"
-                }`}>
+                className={`flex-1 px-3 py-1.5 rounded text-xs font-medium transition-colors ${activeTab === t.id ? "bg-gray-700 " + t.color : "text-gray-500 hover:text-gray-300"}`}>
                 {t.label}
-                {t.id !== "full" && (
-                  <span className="ml-1 opacity-60">({result.platformVariants[t.id].length})</span>
-                )}
+                {t.id !== "full" && <span className="ml-1 opacity-60">({result.platformVariants[t.id].length})</span>}
               </button>
             ))}
           </div>
@@ -621,12 +500,8 @@ export default function TestPage() {
 
           {/* Raw JSON */}
           <details className="bg-gray-900 border border-gray-800 rounded-lg">
-            <summary className="px-4 py-3 cursor-pointer text-xs text-gray-500 hover:text-gray-300">
-              Raw JSON
-            </summary>
-            <pre className="p-4 text-xs text-gray-400 overflow-auto max-h-96 leading-relaxed">
-              {JSON.stringify(result, null, 2)}
-            </pre>
+            <summary className="px-4 py-3 cursor-pointer text-xs text-gray-500 hover:text-gray-300">Raw JSON</summary>
+            <pre className="p-4 text-xs text-gray-400 overflow-auto max-h-96 leading-relaxed">{JSON.stringify(result, null, 2)}</pre>
           </details>
         </div>
       )}

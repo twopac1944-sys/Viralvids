@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { StoryRequest, GeneratedStory, StoryBeat, Character, ResolvedStoryMode } from "@/lib/types/story";
+import {
+  StoryRequest, GeneratedStory, StoryBeat, Character,
+  ResolvedStoryMode, ResolvedVisualStyle,
+} from "@/lib/types/story";
 import { getGenre } from "@/lib/genres/genres";
 import { resolveGenre } from "@/lib/genres/resolveGenre";
+import { resolveVisualStyle } from "@/lib/genres/resolveVisualStyle";
 import { buildStoryPrompt } from "@/lib/claude/storyPrompts";
 import claudeClient from "@/lib/claude/client";
 
 const VALID_STORY_MODES = new Set(["dialogue", "narration", "hybrid", "auto"]);
+const VALID_VISUAL_STYLES = new Set(["photorealistic", "stylized-illustration", "anime", "auto"]);
 const VALID_RESOLVED_MODES = new Set<ResolvedStoryMode>(["dialogue", "narration", "hybrid"]);
+const VALID_RESOLVED_STYLES = new Set<ResolvedVisualStyle>(["photorealistic", "stylized-illustration", "anime"]);
 
 function isValidBeat(b: unknown): b is StoryBeat {
   if (typeof b !== "object" || b === null) return false;
@@ -45,6 +51,7 @@ function isValidStory(data: unknown): data is GeneratedStory {
     typeof s.totalWordCount === "number" &&
     VALID_RESOLVED_MODES.has(s.resolvedStoryMode as ResolvedStoryMode) &&
     typeof s.resolvedGenre === "string" &&
+    VALID_RESOLVED_STYLES.has(s.resolvedVisualStyle as ResolvedVisualStyle) &&
     Array.isArray(s.beats) &&
     s.beats.every(isValidBeat) &&
     Array.isArray(s.characters) &&
@@ -74,24 +81,27 @@ export async function POST(req: NextRequest) {
 
   const storyMode = body.storyMode ?? "auto";
   if (!VALID_STORY_MODES.has(storyMode)) {
-    return NextResponse.json(
-      { error: `Invalid storyMode: ${storyMode}` },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: `Invalid storyMode: ${storyMode}` }, { status: 400 });
   }
 
+  const visualStyle = body.visualStyle ?? "photorealistic";
+  if (!VALID_VISUAL_STYLES.has(visualStyle)) {
+    return NextResponse.json({ error: `Invalid visualStyle: ${visualStyle}` }, { status: 400 });
+  }
+
+  // Resolve genre first, then visual style (style resolver needs the real genre id)
   const resolvedGenre = resolveGenre(body.genre);
   const genre = getGenre(resolvedGenre);
   if (!genre) {
-    return NextResponse.json(
-      { error: `Unknown genre: ${resolvedGenre}` },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: `Unknown genre: ${resolvedGenre}` }, { status: 400 });
   }
 
+  const resolvedVisualStyle = resolveVisualStyle(visualStyle, resolvedGenre);
+
   const { system, user, resolvedStoryMode } = buildStoryPrompt(
-    { ...body, storyMode },
-    genre
+    { ...body, storyMode, visualStyle },
+    genre,
+    resolvedVisualStyle
   );
 
   let rawContent: string;
@@ -105,10 +115,7 @@ export async function POST(req: NextRequest) {
 
     const block = response.content[0];
     if (block.type !== "text") {
-      return NextResponse.json(
-        { error: "Unexpected response type from Claude" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Unexpected response type from Claude" }, { status: 500 });
     }
     rawContent = block.text;
   } catch (err) {
@@ -125,15 +132,11 @@ export async function POST(req: NextRequest) {
     parsed = JSON.parse(cleaned);
   } catch {
     return NextResponse.json(
-      {
-        error: "Failed to parse Claude response as JSON",
-        raw: rawContent.slice(0, 500),
-      },
+      { error: "Failed to parse Claude response as JSON", raw: rawContent.slice(0, 500) },
       { status: 500 }
     );
   }
 
-  // Inject server-resolved fields; add referenceImageUrl/referenceGeneratedAt defaults
   const rawObj = parsed as Record<string, unknown>;
   const characters = Array.isArray(rawObj.characters)
     ? (rawObj.characters as Record<string, unknown>[]).map((c) => ({
@@ -143,14 +146,11 @@ export async function POST(req: NextRequest) {
       }))
     : [];
 
-  const withMeta = { ...rawObj, resolvedStoryMode, resolvedGenre, characters };
+  const withMeta = { ...rawObj, resolvedStoryMode, resolvedGenre, resolvedVisualStyle, characters };
 
   if (!isValidStory(withMeta)) {
     return NextResponse.json(
-      {
-        error: "Claude response does not match GeneratedStory shape",
-        raw: rawContent.slice(0, 500),
-      },
+      { error: "Claude response does not match GeneratedStory shape", raw: rawContent.slice(0, 500) },
       { status: 500 }
     );
   }

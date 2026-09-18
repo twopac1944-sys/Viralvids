@@ -1,4 +1,4 @@
-import { StoryRequest, ResolvedStoryMode } from "@/lib/types/story";
+import { StoryRequest, ResolvedStoryMode, ResolvedVisualStyle } from "@/lib/types/story";
 import { GenrePack } from "@/lib/genres/genres";
 import { resolveStoryMode } from "@/lib/claude/resolveStoryMode";
 
@@ -25,6 +25,26 @@ const STORY_MODE_INSTRUCTIONS: Record<ResolvedStoryMode, string> = {
   Mix narrator and character beats freely — let story structure determine the balance.
   Aim for roughly half narrator, half character-voiced beats, but prioritise what serves each narrative moment.
   Transitions between narrator and character voice should feel seamless, not abrupt.`,
+};
+
+const VISUAL_STYLE_INSTRUCTIONS: Record<ResolvedVisualStyle, string> = {
+  "photorealistic": `VISUAL STYLE: PHOTOREALISTIC
+  All visualPrompt fields must read as live-action cinematography direction.
+  Use camera and lighting vocabulary: lens focal length, shot type, light source, color grade, film texture.
+  Avoid any painted, illustrated, or animated descriptors.
+  Example format: "Tight close-up, 50mm, single practical light from left, desaturated palette, photojournalistic grain, shallow depth of field"`,
+
+  "stylized-illustration": `VISUAL STYLE: STYLIZED ILLUSTRATION
+  All visualPrompt fields must read as graphic novel or concept art direction.
+  Describe composition, color palette, linework quality, and painterly texture cues.
+  Avoid photographic vocabulary — use art direction language instead.
+  Example format: "Wide establishing panel, muted earth tones with crimson accent, bold ink outlines, painterly impasto texture, dramatic rim lighting"`,
+
+  "anime": `VISUAL STYLE: ANIME
+  All visualPrompt fields must target anime / manga visual language.
+  Use dynamic camera angles, expressive character framing, and style-specific lighting descriptors.
+  Reference anime visual vocabulary: cel-shading, speed lines for action, bloom for emotion, sakura / environmental atmosphere.
+  Example format: "Low-angle shot, dramatic cherry blossom scatter, soft pastel rim light, expressive tear-glimmer close-up, cel-shaded, vibrant saturated palette"`,
 };
 
 function feelGoodLoopMechanic(): string {
@@ -61,7 +81,8 @@ function tensionCurveSection(isFeelGood: boolean): string {
 
 export function buildStoryPrompt(
   request: StoryRequest,
-  genre: GenrePack
+  genre: GenrePack,
+  resolvedVisualStyle: ResolvedVisualStyle
 ): { system: string; user: string; resolvedStoryMode: ResolvedStoryMode } {
   const resolvedStoryMode = resolveStoryMode(request.storyMode ?? "auto");
   const targetWords = TARGET_WORDS[request.targetLength];
@@ -102,6 +123,8 @@ ${seriesSection}
 
 ${STORY_MODE_INSTRUCTIONS[resolvedStoryMode]}
 
+${VISUAL_STYLE_INSTRUCTIONS[resolvedVisualStyle]}
+
 YOUR TASK:
 Generate a complete story in the following STRICT ORDER:
 
@@ -126,7 +149,7 @@ STEP 4 — FOR EACH BEAT, assign:
   - narration: the spoken narration text for that beat
   - voiceRole: "narrator" for narration; use "character_[name]" if there is dialogue from a named character
   - emotion: exactly one from this set: tense | dark | hopeful | mysterious | urgent | calm | triumphant | melancholic
-  - visualPrompt: see framing rules below
+  - visualPrompt: write in the VISUAL STYLE specified above — see style instructions for exact format and vocabulary
   - durationSec: word count of narration ÷ 2.5, rounded to nearest integer (minimum 3)
 
 VISUAL FRAMING RULE FOR DIALOGUE BEATS:
