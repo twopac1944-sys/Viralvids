@@ -4,25 +4,41 @@ export type ResolvedStoryMode = "dialogue" | "narration" | "hybrid";
 export interface StoryBeat {
   beatNumber: number;
   narration: string;
-  voiceRole: string;       // e.g. "narrator", "character_1"
-  emotion: string;          // e.g. "tense", "hopeful", "dark"
-  visualPrompt: string;     // description for image/video generation
+  voiceRole: string;       // "narrator" or "character_[name]"
+  emotion: string;
+  visualPrompt: string;
   durationSec: number;
+}
+
+/**
+ * A named character extracted from the story.
+ * referenceImageUrl / referenceGeneratedAt are populated by the
+ * /api/generate-character-sheet route, not by Claude.
+ */
+export interface Character {
+  name: string;
+  voiceRole: string;           // matches beat voiceRole, e.g. "character_Elena"
+  physicalDescription: string; // full visual description for image generation
+  lockedTraits: string[];      // 2-3 hard identifying details extracted from physicalDescription
+  voiceNotes: string;          // how this character speaks (cadence, vocabulary, register)
+  referenceImageUrl: string | null;
+  referenceGeneratedAt: string | null;
 }
 
 export interface GeneratedStory {
   genre: string;
   tone: string;
-  hook: string;              // first 3 seconds, written as narration
-  loopEnding: string;        // final line, written to loop back to hook
+  hook: string;
+  loopEnding: string;
   beats: StoryBeat[];
   totalWordCount: number;
   resolvedStoryMode: ResolvedStoryMode;
-  resolvedGenre: string;     // the actual genre id used (differs from "auto" when auto was requested)
+  resolvedGenre: string;
+  characters: Character[];     // populated for dialogue/hybrid; empty array for narration
   platformVariants: {
-    tiktok30: StoryBeat[];   // condensed beat set for ~30 sec
-    shorts55: StoryBeat[];   // condensed beat set for ~55 sec
-    reels90: StoryBeat[];    // condensed beat set for ~90 sec
+    tiktok30: StoryBeat[];
+    shorts55: StoryBeat[];
+    reels90: StoryBeat[];
   };
 }
 
@@ -33,5 +49,5 @@ export interface StoryRequest {
   storyMode: StoryMode;
   seriesMode: boolean;
   episodeNumber?: number;
-  seriesContext?: string;   // summary of prior episodes if seriesMode is true
+  seriesContext?: string;
 }

@@ -67,6 +67,7 @@ export function buildStoryPrompt(
   const targetWords = TARGET_WORDS[request.targetLength];
   const tone = request.tone;
   const isFeelGood = genre.id === "feel-good";
+  const hasDialogue = resolvedStoryMode === "dialogue" || resolvedStoryMode === "hybrid";
 
   const seriesSection = request.seriesMode && request.seriesContext
     ? `
@@ -74,6 +75,21 @@ SERIES CONTEXT (Episode ${request.episodeNumber ?? "?"}):
 ${request.seriesContext}
 The hook of this episode must connect to events from prior episodes in a way that rewards returning viewers while still making sense to new ones. The loop ending must tease forward into the next episode.`
     : "";
+
+  const characterStep = hasDialogue ? `
+STEP 7 — BUILD THE CHARACTERS ARRAY.
+  For every named character who speaks in any beat (voiceRole "character_[name]"), create one entry:
+  - name: the character's name (no prefix, e.g. "Elena" not "character_Elena")
+  - voiceRole: the exact voiceRole string used in their beats (e.g. "character_Elena")
+  - physicalDescription: 2-4 sentences of specific, visually concrete physical detail.
+    Include: approximate age, build, hair (color, length, style), eyes, any notable features.
+    Be specific enough that an image model could recreate this face consistently across multiple generations.
+  - lockedTraits: extract exactly 2-3 of the most distinctive, hard-to-miss identifying details
+    from physicalDescription as short phrases, e.g. ["late 20s", "shoulder-length black hair with side part", "small scar above left eyebrow"]
+  - voiceNotes: 1 sentence on how this character speaks — vocabulary, pace, register, verbal habits.
+  For narration-only beats: characters array is [].` : `
+STEP 7 — CHARACTERS ARRAY.
+  This story uses narration mode only. Set characters to an empty array [].`;
 
   const system = `You are a master short-form storytelling engine. You write viral, emotionally gripping narratives for social video platforms (TikTok, YouTube Shorts, Instagram Reels).
 
@@ -110,8 +126,16 @@ STEP 4 — FOR EACH BEAT, assign:
   - narration: the spoken narration text for that beat
   - voiceRole: "narrator" for narration; use "character_[name]" if there is dialogue from a named character
   - emotion: exactly one from this set: tense | dark | hopeful | mysterious | urgent | calm | triumphant | melancholic
-  - visualPrompt: a cinematic image/video generation prompt incorporating the genre's visual style keywords. Be specific: camera angle, lighting, subject, mood.
+  - visualPrompt: see framing rules below
   - durationSec: word count of narration ÷ 2.5, rounded to nearest integer (minimum 3)
+
+VISUAL FRAMING RULE FOR DIALOGUE BEATS:
+  When a beat's voiceRole is "character_[name]" (a named character is speaking), write the visualPrompt
+  as a SINGLE-CHARACTER frame — close-up or medium shot of ONLY that speaking character.
+  Do NOT place two characters in the same generated frame.
+  A two-person conversation must alternate: one character per beat, shot/reverse-shot convention.
+  This is required because multi-character shots break identity consistency in AI image generation.
+  Narrator beats may frame scenes more broadly (establishing shots, environment, action sequences).
 
 SHOW-DON'T-TELL CONSTRAINT (applies to every narration field):
   Narration must describe actions and sensory detail only. Never name the emotion or intent behind them.
@@ -140,9 +164,10 @@ STEP 5 — GENERATE THREE PLATFORM VARIANTS by rewriting the beat list at differ
   1. The hook line (Beat 1 narration opening) and the loopEnding line (final beat narration close) must be word-for-word identical across all three variants and the main beats. Never alter, shorten, or paraphrase them. They carry the loop mechanic.
   2. Only middle beats may be cut, merged, or trimmed to hit target word counts.
   3. When cutting beats from the tiktok30 variant, the false-relief beat is the first candidate to cut — but hook and loopEnding are never touched.
-  4. Before finalising each variant, mentally verify: does removing any beat strip context that the loopEnding depends on? (e.g. do not cut the beat that reveals why the hook line is unsettling.) If so, keep that beat and cut a different one.
+  4. Before finalising each variant, mentally verify: does removing any beat strip context that the loopEnding depends on? If so, keep that beat and cut a different one.
 
 STEP 6 — COUNT total words across all main beats' narration fields.
+${characterStep}
 
 OUTPUT FORMAT:
 Return ONLY valid JSON. No preamble. No markdown fences. No explanation. No trailing text.
@@ -155,6 +180,7 @@ The JSON must exactly match this TypeScript type:
   "loopEnding": string,
   "beats": StoryBeat[],
   "totalWordCount": number,
+  "characters": Character[],
   "platformVariants": {
     "tiktok30": StoryBeat[],
     "shorts55": StoryBeat[],
@@ -170,6 +196,15 @@ Where StoryBeat is:
   "emotion": "tense" | "dark" | "hopeful" | "mysterious" | "urgent" | "calm" | "triumphant" | "melancholic",
   "visualPrompt": string,
   "durationSec": number
+}
+
+Where Character is:
+{
+  "name": string,
+  "voiceRole": string,
+  "physicalDescription": string,
+  "lockedTraits": string[],
+  "voiceNotes": string
 }
 
 Platform variant beats should have beatNumber starting from 1 within their own array.`;

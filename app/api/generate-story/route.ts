@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { StoryRequest, GeneratedStory, StoryBeat, ResolvedStoryMode } from "@/lib/types/story";
+import { StoryRequest, GeneratedStory, StoryBeat, Character, ResolvedStoryMode } from "@/lib/types/story";
 import { getGenre } from "@/lib/genres/genres";
 import { resolveGenre } from "@/lib/genres/resolveGenre";
 import { buildStoryPrompt } from "@/lib/claude/storyPrompts";
@@ -21,6 +21,19 @@ function isValidBeat(b: unknown): b is StoryBeat {
   );
 }
 
+function isValidCharacter(c: unknown): c is Character {
+  if (typeof c !== "object" || c === null) return false;
+  const ch = c as Record<string, unknown>;
+  return (
+    typeof ch.name === "string" &&
+    typeof ch.voiceRole === "string" &&
+    typeof ch.physicalDescription === "string" &&
+    Array.isArray(ch.lockedTraits) &&
+    (ch.lockedTraits as unknown[]).every((t) => typeof t === "string") &&
+    typeof ch.voiceNotes === "string"
+  );
+}
+
 function isValidStory(data: unknown): data is GeneratedStory {
   if (typeof data !== "object" || data === null) return false;
   const s = data as Record<string, unknown>;
@@ -34,6 +47,8 @@ function isValidStory(data: unknown): data is GeneratedStory {
     typeof s.resolvedGenre === "string" &&
     Array.isArray(s.beats) &&
     s.beats.every(isValidBeat) &&
+    Array.isArray(s.characters) &&
+    s.characters.every(isValidCharacter) &&
     typeof s.platformVariants === "object" &&
     s.platformVariants !== null &&
     Array.isArray((s.platformVariants as Record<string, unknown>).tiktok30) &&
@@ -65,12 +80,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Resolve genre before pack lookup — "auto" picks a random genre id
-  // NOTE: If seriesMode is true with genre "auto", the caller should pass the
-  // resolvedGenre from episode 1 for all subsequent episodes to keep a series
-  // in one genre. The server is stateless and cannot enforce this automatically.
   const resolvedGenre = resolveGenre(body.genre);
-
   const genre = getGenre(resolvedGenre);
   if (!genre) {
     return NextResponse.json(
@@ -88,7 +98,7 @@ export async function POST(req: NextRequest) {
   try {
     const response = await claudeClient.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 4096,
+      max_tokens: 6000,
       system,
       messages: [{ role: "user", content: user }],
     });
@@ -123,8 +133,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Inject server-resolved fields — Claude does not produce these
-  const withMeta = { ...(parsed as object), resolvedStoryMode, resolvedGenre };
+  // Inject server-resolved fields; add referenceImageUrl/referenceGeneratedAt defaults
+  const rawObj = parsed as Record<string, unknown>;
+  const characters = Array.isArray(rawObj.characters)
+    ? (rawObj.characters as Record<string, unknown>[]).map((c) => ({
+        ...c,
+        referenceImageUrl: null,
+        referenceGeneratedAt: null,
+      }))
+    : [];
+
+  const withMeta = { ...rawObj, resolvedStoryMode, resolvedGenre, characters };
 
   if (!isValidStory(withMeta)) {
     return NextResponse.json(
