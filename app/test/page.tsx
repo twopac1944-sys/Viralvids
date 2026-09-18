@@ -553,7 +553,36 @@ export default function TestPage() {
             <div className="mb-4">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Voice Assignment — Chatterbox</p>
               <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-3">
-                <p className="text-xs text-gray-600">Assign a Chatterbox cloned voice per character. Unassigned characters use Grok TTS.</p>
+                <p className="text-xs text-gray-600">Assign a Chatterbox cloned voice per role. Unassigned roles use Grok TTS.</p>
+                {/* Narrator row */}
+                {(() => {
+                  const assigned = voiceAssignments["narrator"] ?? "";
+                  return (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-400 w-28 truncate shrink-0 italic">narrator</span>
+                      <select
+                        value={assigned}
+                        onChange={(e) => setVoiceAssignments((prev) => ({ ...prev, narrator: e.target.value }))}
+                        className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-white text-xs focus:outline-none focus:border-violet-500"
+                      >
+                        <option value="">Default (Grok TTS)</option>
+                        <optgroup label="Female">
+                          {VOICE_REGISTRY.filter((v) => v.gender === "Female").map((v) => (
+                            <option key={v.id} value={v.id}>{v.label}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Male">
+                          {VOICE_REGISTRY.filter((v) => v.gender === "Male").map((v) => (
+                            <option key={v.id} value={v.id}>{v.label}</option>
+                          ))}
+                        </optgroup>
+                      </select>
+                      {assigned && (
+                        <span className="text-xs text-violet-400 bg-violet-950 border border-violet-800 rounded px-1.5 py-0.5 whitespace-nowrap">CB</span>
+                      )}
+                    </div>
+                  );
+                })()}
                 {charStates.map((cs) => {
                   const charName = cs.character.name;
                   const assigned = voiceAssignments[charName] ?? "";
