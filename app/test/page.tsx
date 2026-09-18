@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { StoryRequest, GeneratedStory, StoryBeat } from "@/lib/types/story";
+import { StoryRequest, GeneratedStory, StoryBeat, StoryMode, ResolvedStoryMode } from "@/lib/types/story";
 
 const ALL_GENRES = [
   { id: "fantasy", label: "Fantasy" },
@@ -43,10 +43,17 @@ const EMOTION_COLORS: Record<string, string> = {
   melancholic: "text-blue-400",
 };
 
+const MODE_BADGE: Record<ResolvedStoryMode, { label: string; color: string; bg: string; border: string }> = {
+  dialogue: { label: "Dialogue", color: "text-amber-300", bg: "bg-amber-950", border: "border-amber-800" },
+  narration: { label: "Narration", color: "text-sky-300", bg: "bg-sky-950", border: "border-sky-800" },
+  hybrid: { label: "Hybrid", color: "text-violet-300", bg: "bg-violet-950", border: "border-violet-800" },
+};
+
 const defaultForm: StoryRequest = {
   genre: "horror",
   tone: "dark",
   targetLength: "60s",
+  storyMode: "auto",
   seriesMode: false,
 };
 
@@ -96,10 +103,8 @@ function VariantIntegrityPanel({
           const beats = variants[key];
           const firstNarration = beats[0]?.narration ?? "";
           const lastNarration = beats[beats.length - 1]?.narration ?? "";
-          const hookMatches =
-            firstNarration === hook || firstNarration.startsWith(hook);
-          const endingMatches =
-            lastNarration === loopEnding || lastNarration.endsWith(loopEnding);
+          const hookMatches = firstNarration === hook || firstNarration.startsWith(hook);
+          const endingMatches = lastNarration === loopEnding || lastNarration.endsWith(loopEnding);
           return (
             <div key={key} className={`bg-gray-900 border ${border} rounded-lg p-3`}>
               <p className={`text-xs font-semibold mb-3 ${color}`}>{label}</p>
@@ -127,10 +132,7 @@ function VariantIntegrityPanel({
 
 function BeatList({ beats }: { beats: StoryBeat[] }) {
   const totalSec = beats.reduce((s, b) => s + b.durationSec, 0);
-  const totalWords = beats.reduce(
-    (s, b) => s + b.narration.split(" ").length,
-    0
-  );
+  const totalWords = beats.reduce((s, b) => s + b.narration.split(" ").length, 0);
   return (
     <div>
       <p className="text-xs text-gray-500 mb-3">
@@ -141,9 +143,7 @@ function BeatList({ beats }: { beats: StoryBeat[] }) {
           <div key={beat.beatNumber} className="border-l-2 border-gray-700 pl-4">
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-1">
               <span className="text-gray-500">#{beat.beatNumber}</span>
-              <span className={EMOTION_COLORS[beat.emotion] ?? "text-gray-400"}>
-                {beat.emotion}
-              </span>
+              <span className={EMOTION_COLORS[beat.emotion] ?? "text-gray-400"}>{beat.emotion}</span>
               <span className="text-blue-400">{beat.voiceRole}</span>
               <span className="text-gray-500">{beat.durationSec}s</span>
             </div>
@@ -159,9 +159,15 @@ function BeatList({ beats }: { beats: StoryBeat[] }) {
 export default function TestPage() {
   const [form, setForm] = useState<StoryRequest>(defaultForm);
   const [result, setResult] = useState<GeneratedStory | null>(null);
+  const [requestedMode, setRequestedMode] = useState<StoryMode>("auto");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("full");
+  const [modeCount, setModeCount] = useState<Record<ResolvedStoryMode, number>>({
+    dialogue: 0,
+    narration: 0,
+    hybrid: 0,
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -169,6 +175,7 @@ export default function TestPage() {
     setError(null);
     setResult(null);
     setActiveTab("full");
+    const submittedMode = form.storyMode;
     try {
       const res = await fetch("/api/generate-story", {
         method: "POST",
@@ -177,7 +184,13 @@ export default function TestPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setResult(data as GeneratedStory);
+      const story = data as GeneratedStory;
+      setResult(story);
+      setRequestedMode(submittedMode);
+      setModeCount((prev) => ({
+        ...prev,
+        [story.resolvedStoryMode]: prev[story.resolvedStoryMode] + 1,
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -189,6 +202,11 @@ export default function TestPage() {
     result && activeTab !== "full"
       ? result.platformVariants[activeTab]
       : result?.beats ?? [];
+
+  const totalGenerated = modeCount.dialogue + modeCount.narration + modeCount.hybrid;
+  const dialoguePct = totalGenerated > 0 ? Math.round((modeCount.dialogue / totalGenerated) * 100) : 0;
+  const narrationPct = totalGenerated > 0 ? Math.round((modeCount.narration / totalGenerated) * 100) : 0;
+  const hybridPct = totalGenerated > 0 ? Math.round((modeCount.hybrid / totalGenerated) * 100) : 0;
 
   return (
     <main className="min-h-screen bg-gray-950 text-gray-100 p-8 font-mono">
@@ -218,9 +236,7 @@ export default function TestPage() {
             <label className="block text-xs text-gray-400 mb-1">Tone</label>
             <select
               value={form.tone}
-              onChange={(e) =>
-                setForm({ ...form, tone: e.target.value as StoryRequest["tone"] })
-              }
+              onChange={(e) => setForm({ ...form, tone: e.target.value as StoryRequest["tone"] })}
               className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
             >
               <option value="dark">Dark</option>
@@ -232,9 +248,7 @@ export default function TestPage() {
             <label className="block text-xs text-gray-400 mb-1">Length</label>
             <select
               value={form.targetLength}
-              onChange={(e) =>
-                setForm({ ...form, targetLength: e.target.value as StoryRequest["targetLength"] })
-              }
+              onChange={(e) => setForm({ ...form, targetLength: e.target.value as StoryRequest["targetLength"] })}
               className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
             >
               <option value="30s">30 seconds</option>
@@ -245,6 +259,20 @@ export default function TestPage() {
           </div>
         </div>
 
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Story Mode</label>
+          <select
+            value={form.storyMode}
+            onChange={(e) => setForm({ ...form, storyMode: e.target.value as StoryMode })}
+            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+          >
+            <option value="auto">Auto (75% dialogue / 25% narration)</option>
+            <option value="dialogue">Dialogue</option>
+            <option value="narration">Narration</option>
+            <option value="hybrid">Hybrid</option>
+          </select>
+        </div>
+
         <div className="flex items-center gap-3">
           <input
             type="checkbox"
@@ -253,9 +281,7 @@ export default function TestPage() {
             onChange={(e) => setForm({ ...form, seriesMode: e.target.checked })}
             className="w-4 h-4 accent-indigo-500"
           />
-          <label htmlFor="seriesMode" className="text-xs text-gray-400">
-            Series Mode
-          </label>
+          <label htmlFor="seriesMode" className="text-xs text-gray-400">Series Mode</label>
         </div>
 
         {form.seriesMode && (
@@ -267,19 +293,14 @@ export default function TestPage() {
                 min={1}
                 value={form.episodeNumber ?? ""}
                 onChange={(e) =>
-                  setForm({
-                    ...form,
-                    episodeNumber: e.target.value ? parseInt(e.target.value) : undefined,
-                  })
+                  setForm({ ...form, episodeNumber: e.target.value ? parseInt(e.target.value) : undefined })
                 }
                 className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
                 placeholder="e.g. 2"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">
-                Series Context (prior episode summary)
-              </label>
+              <label className="block text-xs text-gray-400 mb-1">Series Context (prior episode summary)</label>
               <textarea
                 rows={3}
                 value={form.seriesContext ?? ""}
@@ -300,6 +321,37 @@ export default function TestPage() {
         </button>
       </form>
 
+      {/* ── Session Mode Ratio Tracker ── */}
+      {totalGenerated > 0 && (
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 mb-8 max-w-lg">
+          <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">
+            Session Auto Ratio ({totalGenerated} generated)
+          </p>
+          <div className="space-y-2">
+            {(["dialogue", "narration", "hybrid"] as ResolvedStoryMode[]).map((mode) => {
+              const count = modeCount[mode];
+              const pct = mode === "dialogue" ? dialoguePct : mode === "narration" ? narrationPct : hybridPct;
+              const m = MODE_BADGE[mode];
+              return (
+                <div key={mode} className="flex items-center gap-3">
+                  <span className={`text-xs w-16 ${m.color}`}>{m.label}</span>
+                  <div className="flex-1 bg-gray-800 rounded-full h-1.5">
+                    <div
+                      className={`h-1.5 rounded-full ${m.bg} border ${m.border}`}
+                      style={{ width: `${pct}%`, backgroundColor: mode === "dialogue" ? "#92400e" : mode === "narration" ? "#0c4a6e" : "#4c1d95" }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-400 w-20 text-right">
+                    {count} ({pct}%)
+                  </span>
+                </div>
+              );
+            })}
+            <p className="text-xs text-gray-600 pt-1">Target: dialogue ~75% · narration ~25%</p>
+          </div>
+        </div>
+      )}
+
       {/* ── Error ── */}
       {error && (
         <div className="bg-red-900/40 border border-red-700 rounded p-4 mb-6 text-red-300 text-sm max-w-lg">
@@ -312,9 +364,21 @@ export default function TestPage() {
         <div className="max-w-3xl">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-gray-200">
-              {result.beats.length} beats · {result.totalWordCount} words
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-semibold text-gray-200">
+                {result.beats.length} beats · {result.totalWordCount} words
+              </h2>
+              {/* Resolved mode badge */}
+              {(() => {
+                const m = MODE_BADGE[result.resolvedStoryMode];
+                const wasAuto = requestedMode === "auto";
+                return (
+                  <span className={`text-xs font-medium ${m.color} ${m.bg} border ${m.border} rounded px-2 py-0.5`}>
+                    {wasAuto ? `Auto → ${m.label}` : m.label}
+                  </span>
+                );
+              })()}
+            </div>
             <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">
               {result.genre} / {result.tone}
             </span>
@@ -353,9 +417,7 @@ export default function TestPage() {
               >
                 {t.label}
                 {t.id !== "full" && (
-                  <span className="ml-1 opacity-60">
-                    ({result.platformVariants[t.id].length})
-                  </span>
+                  <span className="ml-1 opacity-60">({result.platformVariants[t.id].length})</span>
                 )}
               </button>
             ))}

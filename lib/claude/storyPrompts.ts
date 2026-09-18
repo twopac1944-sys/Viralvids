@@ -1,5 +1,6 @@
-import { StoryRequest } from "@/lib/types/story";
+import { StoryRequest, ResolvedStoryMode } from "@/lib/types/story";
 import { GenrePack } from "@/lib/genres/genres";
+import { resolveStoryMode } from "@/lib/claude/resolveStoryMode";
 
 const TARGET_WORDS: Record<StoryRequest["targetLength"], number> = {
   "30s": 75,
@@ -8,10 +9,29 @@ const TARGET_WORDS: Record<StoryRequest["targetLength"], number> = {
   "3min": 450,
 };
 
+const STORY_MODE_INSTRUCTIONS: Record<ResolvedStoryMode, string> = {
+  dialogue: `STORY MODE: DIALOGUE (75% dialogue / 25% narration)
+  The majority of beats must use voiceRole "character_[name]" — write actual spoken lines as distinct characters would say them.
+  Approximately 1 in 4 beats may use voiceRole "narrator" to set scene or bridge action.
+  Characters must have distinct voices: word choice, rhythm, and cadence should differ between them.
+  Narration beats must be brief — they frame dialogue, they do not replace it.`,
+
+  narration: `STORY MODE: NARRATION (pure narrator voice)
+  Every beat uses voiceRole "narrator". No character dialogue.
+  Write in a cinematic, authoritative narrator voice throughout — describe events from the outside.
+  The narrator may hint at inner states through physical observation only (see show-don't-tell rules below).`,
+
+  hybrid: `STORY MODE: HYBRID (balanced narrator + character voices)
+  Mix narrator and character beats freely — let story structure determine the balance.
+  Aim for roughly half narrator, half character-voiced beats, but prioritise what serves each narrative moment.
+  Transitions between narrator and character voice should feel seamless, not abrupt.`,
+};
+
 export function buildStoryPrompt(
   request: StoryRequest,
   genre: GenrePack
-): { system: string; user: string } {
+): { system: string; user: string; resolvedStoryMode: ResolvedStoryMode } {
+  const resolvedStoryMode = resolveStoryMode(request.storyMode ?? "auto");
   const targetWords = TARGET_WORDS[request.targetLength];
   const tone = request.tone;
 
@@ -30,6 +50,8 @@ TONE: ${tone}
 VOICE STYLE: ${genre.voiceStyleNotes}
 VISUAL STYLE KEYWORDS (embed these naturally in visualPrompt fields): ${genre.visualStyleKeywords.join(", ")}
 ${seriesSection}
+
+${STORY_MODE_INSTRUCTIONS[resolvedStoryMode]}
 
 YOUR TASK:
 Generate a complete story in the following STRICT ORDER:
@@ -127,5 +149,5 @@ Platform variant beats should have beatNumber starting from 1 within their own a
 
 Make it scroll-stopping. The hook must land in under 3 seconds of reading. The loopEnding must make the viewer want to watch again immediately.`;
 
-  return { system, user };
+  return { system, user, resolvedStoryMode };
 }

@@ -1,3 +1,6 @@
+export type StoryMode = "dialogue" | "narration" | "hybrid" | "auto";
+export type ResolvedStoryMode = "dialogue" | "narration" | "hybrid";
+
 export interface StoryBeat {
   beatNumber: number;
   narration: string;
@@ -14,6 +17,7 @@ export interface GeneratedStory {
   loopEnding: string;        // final line, written to loop back to hook
   beats: StoryBeat[];
   totalWordCount: number;
+  resolvedStoryMode: ResolvedStoryMode;
   platformVariants: {
     tiktok30: StoryBeat[];   // condensed beat set for ~30 sec
     shorts55: StoryBeat[];   // condensed beat set for ~55 sec
@@ -25,6 +29,7 @@ export interface StoryRequest {
   genre: string;
   tone: "dark" | "neutral" | "uplifting";
   targetLength: "30s" | "60s" | "90s" | "3min";
+  storyMode: StoryMode;
   seriesMode: boolean;
   episodeNumber?: number;
   seriesContext?: string;   // summary of prior episodes if seriesMode is true

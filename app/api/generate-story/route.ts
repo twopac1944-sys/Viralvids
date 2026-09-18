@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { StoryRequest, GeneratedStory, StoryBeat } from "@/lib/types/story";
+import { StoryRequest, GeneratedStory, StoryBeat, ResolvedStoryMode } from "@/lib/types/story";
 import { getGenre } from "@/lib/genres/genres";
 import { buildStoryPrompt } from "@/lib/claude/storyPrompts";
 import claudeClient from "@/lib/claude/client";
+
+const VALID_STORY_MODES = new Set(["dialogue", "narration", "hybrid", "auto"]);
+const VALID_RESOLVED_MODES = new Set<ResolvedStoryMode>(["dialogue", "narration", "hybrid"]);
 
 function isValidBeat(b: unknown): b is StoryBeat {
   if (typeof b !== "object" || b === null) return false;
@@ -26,6 +29,7 @@ function isValidStory(data: unknown): data is GeneratedStory {
     typeof s.hook === "string" &&
     typeof s.loopEnding === "string" &&
     typeof s.totalWordCount === "number" &&
+    VALID_RESOLVED_MODES.has(s.resolvedStoryMode as ResolvedStoryMode) &&
     Array.isArray(s.beats) &&
     s.beats.every(isValidBeat) &&
     typeof s.platformVariants === "object" &&
@@ -51,6 +55,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const storyMode = body.storyMode ?? "auto";
+  if (!VALID_STORY_MODES.has(storyMode)) {
+    return NextResponse.json(
+      { error: `Invalid storyMode: ${storyMode}` },
+      { status: 400 }
+    );
+  }
+
   const genre = getGenre(body.genre);
   if (!genre) {
     return NextResponse.json(
@@ -59,7 +71,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { system, user } = buildStoryPrompt(body, genre);
+  const { system, user, resolvedStoryMode } = buildStoryPrompt(
+    { ...body, storyMode },
+    genre
+  );
 
   let rawContent: string;
   try {
@@ -85,7 +100,6 @@ export async function POST(req: NextRequest) {
 
   let parsed: unknown;
   try {
-    // Strip any accidental markdown fences if Claude adds them
     const cleaned = rawContent
       .replace(/^```(?:json)?\s*/i, "")
       .replace(/\s*```$/i, "")
@@ -101,7 +115,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!isValidStory(parsed)) {
+  // Inject resolvedStoryMode server-side — Claude does not produce this field
+  const withMode = { ...(parsed as object), resolvedStoryMode };
+
+  if (!isValidStory(withMode)) {
     return NextResponse.json(
       {
         error: "Claude response does not match GeneratedStory shape",
@@ -111,5 +128,5 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json(parsed);
+  return NextResponse.json(withMode);
 }
