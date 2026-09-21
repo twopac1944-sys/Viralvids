@@ -77,7 +77,9 @@ function buildScriptedModeInstructions(isWarmArc: boolean): string {
     ✓ RIGHT: { beatType: "dialogue", voiceRole: "character_Daniel", narration: "She left the ring right here. Just... left it.",
                visualPrompt: "close-up of gold ring on white tile counter, Daniel's hand entering frame from the right" }
 
-  FIRST-PERSON DIALOGUE RULE (scripted mode):
+  DIALOGUE QUALITY VERIFICATION — run both checks on every beat before finalizing:
+
+    CHECK 1 — NATURAL SPEECH (first-person rule):
     All dialogue beats must sound like words a real person actually speaks aloud.
     Third-person narration disguised as dialogue is not allowed.
     Two valid forms:
@@ -89,6 +91,18 @@ function buildScriptedModeInstructions(isWarmArc: boolean): string {
         ✗ voiceRole: "character_Mae", narration: "She'd been saving that seat for twelve years."  ← wrong POV for self-reference
     If a line reads like a novel's opening sentence rather than something a person says out loud,
     rewrite it as first person or reassign it to a character who is speaking about someone else.
+
+    CHECK 2 — PHYSICAL PLAUSIBILITY:
+    Before finalizing any line that describes a physical action or object placement, verify it
+    makes real-world logical sense. Ask: would this object actually be placed there in reality?
+    Does this action physically make sense given the object and location described?
+      ✗ "I've been leaving a croissant on this stool for six years." — a stool is for sitting,
+        not a surface for food. Illogical placement.
+      ✓ "I've been leaving a croissant on this counter every morning for six years." — a counter
+        is where you actually set food down. Physically coherent.
+    Check every physical detail — object locations, surface types, spatial relationships — against
+    real-world plausibility before finalizing the beat. If a detail is illogical, fix it: choose
+    a surface or location that a person would genuinely use for that object or action.
 
   B-ROLL USAGE PHILOSOPHY:
     B-roll beats are optional and should only be used where they genuinely serve the story —
@@ -243,6 +257,14 @@ STEP 1 — WRITE THE HOOK AND LOOP ENDING AS A LINKED PAIR FIRST.
   - The hook is the opening line (first ~3 seconds). It must be an immediate, irresistible entry point.
   - The loopEnding is the final line. It must recontextualize the hook — hearing it should make the viewer want to watch from the beginning again. The ending loops back to the hook emotionally or literally.
   - Design these two lines as one unit before writing anything else.
+  - SCRIPTED MODE HOOK CONSTRAINT: the hook must be a line a character actually speaks aloud —
+    first-person ("I've been saving that seat for twelve years") or a second character speaking
+    about the subject ("She's been saving that seat for twelve years — you know that, right?").
+    A hook that reads like a novel's opening sentence ("She'd been saving that seat for twelve years")
+    is third-person narration, not dialogue. Rewrite it before continuing.
+  - PHYSICAL PLAUSIBILITY: every object placement and physical action in the hook must make
+    real-world sense. A croissant on a stool is illogical (stools are for sitting). A croissant
+    on a counter, plate, or windowsill is coherent. Fix any illogical detail before moving on.
 ${isFeelGood ? feelGoodLoopMechanic() : ""}
 
 STEP 2 — BUILD THE MIDDLE using this arc:
