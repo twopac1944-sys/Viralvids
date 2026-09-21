@@ -70,7 +70,7 @@ function buildScriptedModeInstructions(isWarmArc: boolean): string {
   HOOK AND LOOP ENDING RULES (non-negotiable):
     - Beat 1 must ALWAYS be beatType "dialogue". The hook is a spoken line from a character — never a B-roll beat.
     - The final beat must ALWAYS be beatType "dialogue". The loop ending is spoken — never a B-roll beat.
-    - B-roll beats may NEVER carry narration or dialogue text. The narration field on any broll beat must always be exactly "".
+    - B-roll beats may NEVER carry narration or dialogue text. The narration field on any broll beat must always be exactly "" — no exceptions.
     - If the hook or loop ending is built around a visual image or object (e.g. a ring on a counter),
       a character must speak about it — the image is shown via visualPrompt on that same dialogue beat.
     ✗ WRONG: { beatType: "broll", narration: "She left the ring on the counter." }
@@ -91,6 +91,16 @@ function buildScriptedModeInstructions(isWarmArc: boolean): string {
     2. Mid-story: a pacing pause at a moment of emotional weight (see mid-story content rule below)
     3. Pre-resolution: a held breath just before the final reveal
     Never place two B-roll beats consecutively. Never exceed 3 total.
+
+  B-ROLL NARRATION FIELD — ABSOLUTE RULE:
+    A B-roll beat's narration field must be an empty string with NO exceptions — not dialogue,
+    not a stage direction, not an action description like "She nods once" or "Looks at the window."
+    Any physical action, gesture, or visual detail for a B-roll beat belongs ENTIRELY in the
+    visualPrompt field, never in narration. The narration field exists only to hold words a
+    character speaks aloud — if there are no spoken words in a beat, narration is "".
+    ✗ WRONG: { beatType: "broll", narration: "She nods once. Looks at the window." }
+    ✓ RIGHT:  { beatType: "broll", narration: "",
+                visualPrompt: "Close-up on her face as she nods once, gaze shifting to the window, afternoon light catching the movement." }
 
 ${midBrollRule}
 
