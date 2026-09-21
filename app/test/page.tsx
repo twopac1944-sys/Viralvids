@@ -47,7 +47,8 @@ const EMOTION_COLORS: Record<string, string> = {
 const MODE_BADGE: Record<ResolvedStoryMode, { label: string; color: string; bg: string; border: string }> = {
   dialogue: { label: "Dialogue", color: "text-amber-300", bg: "bg-amber-950", border: "border-amber-800" },
   narration: { label: "Narration", color: "text-sky-300", bg: "bg-sky-950", border: "border-sky-800" },
-  hybrid: { label: "Hybrid", color: "text-violet-300", bg: "bg-violet-950", border: "border-violet-800" },
+  hybrid:   { label: "Hybrid",   color: "text-violet-300", bg: "bg-violet-950", border: "border-violet-800" },
+  scripted: { label: "Scripted", color: "text-rose-300",   bg: "bg-rose-950",   border: "border-rose-800" },
 };
 
 const STYLE_BADGE: Record<ResolvedVisualStyle, { label: string; color: string; bg: string; border: string }> = {
@@ -235,7 +236,7 @@ export default function TestPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("full");
-  const [modeCount, setModeCount] = useState<Record<ResolvedStoryMode, number>>({ dialogue: 0, narration: 0, hybrid: 0 });
+  const [modeCount, setModeCount] = useState<Record<ResolvedStoryMode, number>>({ dialogue: 0, narration: 0, hybrid: 0, scripted: 0 });
   const [genreCount, setGenreCount] = useState<Record<string, number>>({});
   const [autoGenreTotal, setAutoGenreTotal] = useState(0);
 
@@ -465,9 +466,9 @@ export default function TestPage() {
             <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">Story Mode Ratio ({totalModeGenerated})</p>
               <div className="space-y-2">
-                {(["dialogue", "narration", "hybrid"] as ResolvedStoryMode[]).map((mode) => (
+                {(["dialogue", "narration", "hybrid", "scripted"] as ResolvedStoryMode[]).map((mode) => (
                   <RatioBar key={mode} label={MODE_BADGE[mode].label} count={modeCount[mode]}
-                    total={totalModeGenerated} barColor={{ dialogue: "#92400e", narration: "#0c4a6e", hybrid: "#4c1d95" }[mode]} />
+                    total={totalModeGenerated} barColor={{ dialogue: "#92400e", narration: "#0c4a6e", hybrid: "#4c1d95", scripted: "#881337" }[mode]} />
                 ))}
                 <p className="text-xs text-gray-600 pt-1">Target: dialogue ~75% · narration ~25%</p>
               </div>

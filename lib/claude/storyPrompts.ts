@@ -9,7 +9,7 @@ const TARGET_WORDS: Record<StoryRequest["targetLength"], number> = {
   "3min": 450,
 };
 
-const STORY_MODE_INSTRUCTIONS: Record<ResolvedStoryMode, string> = {
+const STORY_MODE_INSTRUCTIONS: Record<Exclude<ResolvedStoryMode, "scripted">, string> = {
   dialogue: `STORY MODE: DIALOGUE (75% dialogue / 25% narration)
   The majority of beats must use voiceRole "character_[name]" — write actual spoken lines as distinct characters would say them.
   Approximately 1 in 4 beats may use voiceRole "narrator" to set scene or bridge action.
@@ -25,8 +25,44 @@ const STORY_MODE_INSTRUCTIONS: Record<ResolvedStoryMode, string> = {
   Mix narrator and character beats freely — let story structure determine the balance.
   Aim for roughly half narrator, half character-voiced beats, but prioritise what serves each narrative moment.
   Transitions between narrator and character voice should feel seamless, not abrupt.`,
+};
 
-  scripted: `STORY MODE: SCRIPTED (zero narration — pure acted dialogue + B-roll cutaways)
+function buildScriptedModeInstructions(isWarmArc: boolean): string {
+  const midBrollRule = isWarmArc
+    ? `  MID-STORY B-ROLL CONTENT RULE (warm/continuous arc — pacing, not tension):
+    This genre has a warm, continuous emotional arc rather than a rising-threat arc. The mid-story
+    B-roll is a PACING BEAT — a lingering shot on an object, gesture, or moment of significance
+    from the immediately preceding dialogue beat, giving the audience a beat to feel the emotional
+    weight before the story continues. It is not a tension cut; it is a pause-and-feel cut.
+    The visualPrompt must still reference the location, object, or person from the preceding dialogue
+    beat — the coherence rule is the same, only the emotional function differs.
+    ✓ GOOD: Preceding dialogue — "She never set a camera. Never called anyone. She just baked one extra."
+             Mid-story B-roll — slow push-in on the single extra croissant sitting alone on the counter,
+             morning light catching the flour dust settling around it.
+             (Lingers on the object the dialogue just named; lets the quiet generosity of the act breathe.)
+    ✓ GOOD: Preceding dialogue — a character describes leaving their father's voicemails unheard for a year.
+             Mid-story B-roll — ECU of a phone screen, the notification badge showing the unplayed count,
+             a thumb hovering just above it without pressing.
+             (Visual pause on the emotional object; audience feels the weight before the story moves on.)
+    ✗ BAD:  Preceding dialogue — character names a specific object or place.
+             B-roll — a different location or person with no connection to what was just spoken.
+             (Breaks coherence — warm-arc rule is pacing, not ambient mood-setting.)`
+    : `  MID-STORY B-ROLL CONTENT RULE (tension arc — held breath before the twist):
+    The visualPrompt for the mid-story B-roll must explicitly reference the location, object, or person
+    named or implied in the immediately preceding dialogue beat. It must function as a camera cutaway
+    a film editor would choose to reinforce or reveal something about the current scene — never a
+    disconnected atmospheric shot introducing a new, unestablished location or person.
+    ✓ GOOD: Preceding dialogue — character says she hasn't heard from her mother in days.
+             B-roll — slow push-in on the living room chair she came home to find occupied.
+             (Same location; reveals to the audience what the character isn't seeing.)
+    ✓ GOOD: Preceding dialogue — detective asks whose coat is on the barrier — she was wearing it on camera.
+             B-roll — slow push-in on the folded coat, a phone screen visible tucked beneath one fold.
+             (Cuts to the specific object named; reveals a new detail that escalates the mystery.)
+    ✗ BAD:  Preceding dialogue — character describes a sound on a voicemail, heard in their apartment.
+             B-roll — ECU of a woman's hand on an outdoor railing with no stated connection to the scene.
+             (Introduces a new location and unidentified person with no bridge from the dialogue around it.)`;
+
+  return `STORY MODE: SCRIPTED (zero narration — pure acted dialogue + B-roll cutaways)
   ABSOLUTE RULE: There must be zero narrator beats. Every beat is one of two types:
   • beatType "dialogue": a character speaks — narration = the spoken line, voiceRole = "character_[Name]", durationSec = word count ÷ 2.5
   • beatType "broll": a wordless visual cutaway — narration = "", voiceRole = "", durationSec = 3–6s (visual timing only, not word count)
@@ -43,29 +79,16 @@ const STORY_MODE_INSTRUCTIONS: Record<ResolvedStoryMode, string> = {
 
   B-ROLL PLACEMENT RULES — all three positions are mandatory, none are optional:
     1. Beat 2 must always be a B-roll beat (establishing / world-setting before any dialogue)
-    2. One B-roll beat mid-story at a tension high-point (held breath before the twist)
+    2. One B-roll beat mid-story (see mid-story B-roll content rule below for this genre's framing)
     3. One B-roll beat just before the final reveal (pre-resolution pause)
     Total B-roll beats: exactly 3 — one per named position above, never consecutive.
 
-  MID-STORY B-ROLL CONTENT RULE:
-    The visualPrompt for the mid-story B-roll must explicitly reference the location, object, or person
-    named or implied in the immediately preceding dialogue beat. It must function as a camera cutaway
-    a film editor would choose to reinforce or reveal something about the current scene — never a
-    disconnected atmospheric shot introducing a new, unestablished location or person.
-    ✓ GOOD: Preceding dialogue — character says she hasn't heard from her mother in days.
-             B-roll — slow push-in on the living room chair she came home to find occupied.
-             (Same location; reveals to the audience what the character isn't seeing.)
-    ✓ GOOD: Preceding dialogue — character describes baking one extra croissant every single night.
-             B-roll — the bakery door ajar in pre-dawn dark, a small silhouette at the edge of frame.
-             (The mystery visitor the scene has been building toward — same scene, imminent payoff.)
-    ✗ BAD:  Preceding dialogue — character describes a sound on a voicemail, heard in their apartment.
-             B-roll — ECU of a woman's hand on an outdoor railing with no stated connection to the scene.
-             (Introduces a new location and unidentified person with no bridge from the dialogue around it.)
+${midBrollRule}
 
   DIALOGUE BEATS: Characters speak in naturalistic, emotionally charged lines.
     No "as you know Bob", no exposition dumps — action and subtext only.
-    Each character has a distinct rhythm. Short sentences under pressure; longer when confessing.`,
-};
+    Each character has a distinct rhythm. Short sentences under pressure; longer when confessing.`;
+}
 
 const VISUAL_STYLE_INSTRUCTIONS: Record<ResolvedVisualStyle, string> = {
   "photorealistic": `VISUAL STYLE: PHOTOREALISTIC
@@ -130,6 +153,12 @@ export function buildStoryPrompt(
   const isFeelGood = genre.id === "feel-good";
   const hasDialogue = resolvedStoryMode === "dialogue" || resolvedStoryMode === "hybrid" || resolvedStoryMode === "scripted";
   const isScripted = resolvedStoryMode === "scripted";
+  // Warm-arc genres have a continuous positive emotional curve rather than a rising-threat arc.
+  // Uses pacing B-rolls at the mid-story position instead of tension-high-point cutaways.
+  const isWarmArc = genre.toneDefault === "uplifting";
+  const modeInstructions = isScripted
+    ? buildScriptedModeInstructions(isWarmArc)
+    : STORY_MODE_INSTRUCTIONS[resolvedStoryMode as Exclude<ResolvedStoryMode, "scripted">];
 
   const seriesSection = request.seriesMode && request.seriesContext
     ? `
@@ -171,7 +200,7 @@ VOICE STYLE: ${genre.voiceStyleNotes}
 VISUAL STYLE KEYWORDS (embed these naturally in visualPrompt fields): ${genre.visualStyleKeywords.join(", ")}
 ${seriesSection}
 
-${STORY_MODE_INSTRUCTIONS[resolvedStoryMode]}
+${modeInstructions}
 
 ${VISUAL_STYLE_INSTRUCTIONS[resolvedVisualStyle]}
 
