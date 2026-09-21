@@ -77,11 +77,20 @@ function buildScriptedModeInstructions(isWarmArc: boolean): string {
     ✓ RIGHT: { beatType: "dialogue", voiceRole: "character_Daniel", narration: "She left the ring right here. Just... left it.",
                visualPrompt: "close-up of gold ring on white tile counter, Daniel's hand entering frame from the right" }
 
-  B-ROLL PLACEMENT RULES — all three positions are mandatory, none are optional:
-    1. Beat 2 must always be a B-roll beat (establishing / world-setting before any dialogue)
-    2. One B-roll beat mid-story (see mid-story B-roll content rule below for this genre's framing)
-    3. One B-roll beat just before the final reveal (pre-resolution pause)
-    Total B-roll beats: exactly 3 — one per named position above, never consecutive.
+  B-ROLL USAGE PHILOSOPHY:
+    B-roll beats are optional and should only be used where they genuinely serve the story —
+    a visual pause that earns its place, not a quota to fill.
+    A story may use 0, 1, 2, or 3 B-roll beats depending on what the story actually calls for.
+    Before adding any B-roll beat, ask: does this moment need a visual pause, or does the
+    dialogue carry the scene better on its own without interruption? If the dialogue is strong
+    enough to carry straight through, don't insert a B-roll just to hit a count.
+
+  B-ROLL PLACEMENT GUIDANCE (applies only when a B-roll beat is used):
+    The natural positions where a B-roll earns its place — use these as your guide IF you use one:
+    1. Early / establishing (around beat 2): world-setting before the characters engage
+    2. Mid-story: a pacing pause at a moment of emotional weight (see mid-story content rule below)
+    3. Pre-resolution: a held breath just before the final reveal
+    Never place two B-roll beats consecutively. Never exceed 3 total.
 
 ${midBrollRule}
 
