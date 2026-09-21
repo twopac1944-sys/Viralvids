@@ -77,6 +77,19 @@ function buildScriptedModeInstructions(isWarmArc: boolean): string {
     ✓ RIGHT: { beatType: "dialogue", voiceRole: "character_Daniel", narration: "She left the ring right here. Just... left it.",
                visualPrompt: "close-up of gold ring on white tile counter, Daniel's hand entering frame from the right" }
 
+  FIRST-PERSON DIALOGUE RULE (scripted mode):
+    All dialogue beats must sound like words a real person actually speaks aloud.
+    Third-person narration disguised as dialogue is not allowed.
+    Two valid forms:
+      Path A — the subject speaks in first person:
+        ✓ "I've been saving that seat for twelve years."
+        ✗ "She'd been saving that seat for twelve years."  ← narration, not dialogue
+      Path B — a second character speaks about the subject in third person:
+        ✓ voiceRole: "character_Ben", narration: "She's been saving that seat for twelve years. You know that."
+        ✗ voiceRole: "character_Mae", narration: "She'd been saving that seat for twelve years."  ← wrong POV for self-reference
+    If a line reads like a novel's opening sentence rather than something a person says out loud,
+    rewrite it as first person or reassign it to a character who is speaking about someone else.
+
   B-ROLL USAGE PHILOSOPHY:
     B-roll beats are optional and should only be used where they genuinely serve the story —
     a visual pause that earns its place, not a quota to fill.
