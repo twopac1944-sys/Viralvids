@@ -25,8 +25,9 @@ function buildStyleLock(visualStyle: ResolvedVisualStyle): { prefix: string; suf
 }
 
 /**
- * Generates a character reference portrait using WaveSpeed Flux Dev (text-to-image).
- * Style is locked by visualStyle to prevent model drift toward cartoon/illustrated output.
+ * Generates a character reference portrait using GPT Image 2 (text-to-image).
+ * GPT Image 2 natively targets photorealism and does not require guidance_scale tuning.
+ * Style is locked by visualStyle via the style-lock-first prompt structure.
  * The resulting URL is used as the identity anchor for PixVerse C1 reference-to-video.
  */
 export async function generateCharacterSheet(
@@ -54,12 +55,9 @@ export async function generateCharacterSheet(
     .filter(Boolean)
     .join(" ");
 
-  return generate("wavespeed-ai/flux-dev", {
+  // GPT Image 2 uses a size string rather than separate width/height params
+  return generate("openai/gpt-image-2/text-to-image", {
     prompt,
-    width: 768,
-    height: 1024,
-    num_inference_steps: 35,
-    guidance_scale: 7.5,
-    num_images: 1,
+    size: "1024x1536", // portrait 2:3 — closest to 9:16 available
   });
 }
