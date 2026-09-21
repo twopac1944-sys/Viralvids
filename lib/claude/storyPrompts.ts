@@ -30,11 +30,38 @@ const STORY_MODE_INSTRUCTIONS: Record<ResolvedStoryMode, string> = {
   ABSOLUTE RULE: There must be zero narrator beats. Every beat is one of two types:
   • beatType "dialogue": a character speaks — narration = the spoken line, voiceRole = "character_[Name]", durationSec = word count ÷ 2.5
   • beatType "broll": a wordless visual cutaway — narration = "", voiceRole = "", durationSec = 3–6s (visual timing only, not word count)
-  B-ROLL PLACEMENT RULES:
-    - Beat 2 must always be a B-roll beat (establishing / world-setting before dialogue begins)
-    - Place one B-roll beat mid-story at a tension high-point (held breath before the twist)
-    - Place one B-roll beat just before the final reveal (pre-resolution pause)
-    - Total B-roll beats: exactly 2–3 in a 90s story, never consecutive
+
+  HOOK AND LOOP ENDING RULES (non-negotiable):
+    - Beat 1 must ALWAYS be beatType "dialogue". The hook is a spoken line from a character — never a B-roll beat.
+    - The final beat must ALWAYS be beatType "dialogue". The loop ending is spoken — never a B-roll beat.
+    - B-roll beats may NEVER carry narration or dialogue text. The narration field on any broll beat must always be exactly "".
+    - If the hook or loop ending is built around a visual image or object (e.g. a ring on a counter),
+      a character must speak about it — the image is shown via visualPrompt on that same dialogue beat.
+    ✗ WRONG: { beatType: "broll", narration: "She left the ring on the counter." }
+    ✓ RIGHT: { beatType: "dialogue", voiceRole: "character_Daniel", narration: "She left the ring right here. Just... left it.",
+               visualPrompt: "close-up of gold ring on white tile counter, Daniel's hand entering frame from the right" }
+
+  B-ROLL PLACEMENT RULES — all three positions are mandatory, none are optional:
+    1. Beat 2 must always be a B-roll beat (establishing / world-setting before any dialogue)
+    2. One B-roll beat mid-story at a tension high-point (held breath before the twist)
+    3. One B-roll beat just before the final reveal (pre-resolution pause)
+    Total B-roll beats: exactly 3 — one per named position above, never consecutive.
+
+  MID-STORY B-ROLL CONTENT RULE:
+    The visualPrompt for the mid-story B-roll must explicitly reference the location, object, or person
+    named or implied in the immediately preceding dialogue beat. It must function as a camera cutaway
+    a film editor would choose to reinforce or reveal something about the current scene — never a
+    disconnected atmospheric shot introducing a new, unestablished location or person.
+    ✓ GOOD: Preceding dialogue — character says she hasn't heard from her mother in days.
+             B-roll — slow push-in on the living room chair she came home to find occupied.
+             (Same location; reveals to the audience what the character isn't seeing.)
+    ✓ GOOD: Preceding dialogue — character describes baking one extra croissant every single night.
+             B-roll — the bakery door ajar in pre-dawn dark, a small silhouette at the edge of frame.
+             (The mystery visitor the scene has been building toward — same scene, imminent payoff.)
+    ✗ BAD:  Preceding dialogue — character describes a sound on a voicemail, heard in their apartment.
+             B-roll — ECU of a woman's hand on an outdoor railing with no stated connection to the scene.
+             (Introduces a new location and unidentified person with no bridge from the dialogue around it.)
+
   DIALOGUE BEATS: Characters speak in naturalistic, emotionally charged lines.
     No "as you know Bob", no exposition dumps — action and subtext only.
     Each character has a distinct rhythm. Short sentences under pressure; longer when confessing.`,
@@ -165,6 +192,7 @@ STEP 3 — BREAK INTO 5–8 BEATS.
   Each beat is one distinct narrative moment. Duration is calculated at 2.5 words per second.
   Beat 1 must contain or open with the hook line.
   The final beat must end with the loopEnding line.
+  SCRIPTED MODE: the 5–8 beat cap is absolute. B-roll beats count toward this total. Never generate more than 8 beats regardless of story complexity.
 
 ${tensionCurveSection(isFeelGood)}
 
