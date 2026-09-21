@@ -349,7 +349,7 @@ export default function TestPage() {
       const res = await fetch("/api/generate-character-sheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ character: charState.character }),
+        body: JSON.stringify({ character: charState.character, visualStyle: result?.resolvedVisualStyle ?? "photorealistic" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);

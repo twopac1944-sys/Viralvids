@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Character } from "@/lib/types/story";
+import { Character, ResolvedVisualStyle } from "@/lib/types/story";
 import { generateCharacterSheet } from "@/lib/wavespeed/generateCharacterSheet";
 
 export async function POST(req: NextRequest) {
-  let body: { character: Character };
+  let body: { character: Character; visualStyle?: ResolvedVisualStyle };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { character } = body;
+  const { character, visualStyle = "photorealistic" } = body;
   if (
     !character ||
     typeof character.name !== "string" ||
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   let imageUrl: string;
   try {
-    imageUrl = await generateCharacterSheet(character);
+    imageUrl = await generateCharacterSheet(character, visualStyle);
   } catch (err) {
     const message = err instanceof Error ? err.message : "WaveSpeed generation failed";
     return NextResponse.json({ error: message }, { status: 502 });
