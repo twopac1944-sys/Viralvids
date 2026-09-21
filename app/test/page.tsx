@@ -230,7 +230,11 @@ export default function TestPage() {
   const [directing, setDirecting] = useState(false);
   const [directionError, setDirectionError] = useState<string | null>(null);
   const [voiceAssignments, setVoiceAssignments] = useState<Record<string, string>>({});
-  const [audioMap, setAudioMap] = useState<Record<number, { base64: string; audioMime: string; voice: string; cleanText: string; engine: string; exaggeration?: number; cfg?: number }>>({});
+  const [audioMap, setAudioMap] = useState<Record<number, { base64: string; audioMime: string; voice: string; cleanText: string; engine: string; audioUrl?: string; exaggeration?: number; cfg?: number }>>({});
+
+  type ClipStage = "idle" | "generating-video" | "syncing-audio" | "complete" | "error";
+  type ClipState = { stage: ClipStage; generatedVideoUrl?: string; videoUrl?: string; error?: string };
+  const [clipMap, setClipMap] = useState<Record<number, ClipState>>({});
   const [synthLoading, setSynthLoading] = useState(false);
   const [synthError, setSynthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -314,7 +318,7 @@ export default function TestPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      const map: Record<number, { base64: string; audioMime: string; voice: string; cleanText: string; engine: string; exaggeration?: number; cfg?: number }> = {};
+      const map: Record<number, { base64: string; audioMime: string; voice: string; cleanText: string; engine: string; audioUrl?: string; exaggeration?: number; cfg?: number }> = {};
       for (const item of data.audio) {
         map[item.beatNumber] = {
           base64: item.audioBase64,
@@ -322,6 +326,7 @@ export default function TestPage() {
           voice: item.voice,
           cleanText: item.cleanText,
           engine: item.engine ?? "grok",
+          audioUrl: item.audioUrl,
           exaggeration: item.exaggeration,
           cfg: item.cfg,
         };
@@ -352,6 +357,47 @@ export default function TestPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Generation failed";
       setCharStates((prev) => prev.map((cs, i) => i === index ? { ...cs, loading: false, error: msg } : cs));
+    }
+  }
+
+  async function handleGenerateClip(beatNumber: number, audioUrl: string) {
+    if (!result) return;
+    setClipMap((prev) => ({ ...prev, [beatNumber]: { stage: "generating-video" } }));
+    try {
+      const res = await fetch("/api/generate-clip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ story: result, beatNumber, audioUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // Lipsync-failed response may include a generatedVideoUrl for debugging
+        setClipMap((prev) => ({
+          ...prev,
+          [beatNumber]: {
+            stage: "error",
+            error: data.error ?? `HTTP ${res.status}`,
+            generatedVideoUrl: data.generatedVideoUrl,
+          },
+        }));
+        return;
+      }
+      setClipMap((prev) => ({
+        ...prev,
+        [beatNumber]: {
+          stage: "complete",
+          videoUrl: data.videoUrl,
+          generatedVideoUrl: data.generatedVideoUrl,
+        },
+      }));
+    } catch (err) {
+      setClipMap((prev) => ({
+        ...prev,
+        [beatNumber]: {
+          stage: "error",
+          error: err instanceof Error ? err.message : "Clip generation failed",
+        },
+      }));
     }
   }
 
@@ -734,6 +780,79 @@ export default function TestPage() {
                       <p className="text-xs text-gray-400 mb-2 leading-relaxed">{a.cleanText}</p>
                       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                       <audio controls src={src} className="w-full h-8" />
+
+                      {/* Generate Clip — only for Chatterbox beats with a locked reference image */}
+                      {(() => {
+                        const storySource = directedStory ?? result;
+                        const beatData = storySource?.beats.find((b) => b.beatNumber === beat.beatNumber);
+                        const charState = charStates.find((cs) => cs.character.voiceRole === beatData?.voiceRole);
+                        const hasRef = !!charState?.character.referenceImageUrl;
+                        const audioUrl = a.audioUrl;
+                        const clip = clipMap[beat.beatNumber];
+                        if (!isChatterbox || !audioUrl) return null;
+                        return (
+                          <div className="mt-3 border-t border-violet-900 pt-3">
+                            {!hasRef ? (
+                              <p className="text-xs text-gray-600 italic">Generate character sheet to enable clip generation</p>
+                            ) : clip?.stage === "complete" ? (
+                              <div className="space-y-2">
+                                <p className="text-xs text-emerald-400 font-semibold">Clip complete</p>
+                                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                                <video
+                                  controls
+                                  src={clip.videoUrl}
+                                  className="w-full rounded border border-emerald-800 max-h-96"
+                                  style={{ aspectRatio: "9/16", maxWidth: 270 }}
+                                />
+                                {clip.generatedVideoUrl && (
+                                  <details className="mt-1">
+                                    <summary className="text-xs text-gray-600 cursor-pointer">Pre-sync video (for comparison)</summary>
+                                    {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                                    <video controls src={clip.generatedVideoUrl} className="w-full rounded mt-1 max-h-48" style={{ maxWidth: 270 }} />
+                                  </details>
+                                )}
+                                <button
+                                  onClick={() => handleGenerateClip(beat.beatNumber, audioUrl)}
+                                  className="text-xs text-gray-500 hover:text-gray-300 underline"
+                                >
+                                  Regenerate clip
+                                </button>
+                              </div>
+                            ) : clip?.stage === "error" ? (
+                              <div className="space-y-2">
+                                <p className="text-xs text-red-400">{clip.error}</p>
+                                {clip.generatedVideoUrl && (
+                                  <div>
+                                    <p className="text-xs text-gray-500 mb-1">Pre-sync video (lipsync failed — motion only):</p>
+                                    {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                                    <video controls src={clip.generatedVideoUrl} className="w-full rounded border border-gray-700" style={{ maxWidth: 270 }} />
+                                  </div>
+                                )}
+                                <button
+                                  onClick={() => handleGenerateClip(beat.beatNumber, audioUrl)}
+                                  className="text-xs bg-rose-900 hover:bg-rose-800 text-rose-200 border border-rose-700 rounded px-2 py-1"
+                                >
+                                  Retry
+                                </button>
+                              </div>
+                            ) : clip?.stage === "generating-video" || clip?.stage === "syncing-audio" ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-violet-500 animate-pulse" />
+                                <span className="text-xs text-violet-300">
+                                  {clip.stage === "generating-video" ? "Generating video…" : "Syncing audio…"}
+                                </span>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleGenerateClip(beat.beatNumber, audioUrl)}
+                                className="text-xs bg-violet-800 hover:bg-violet-700 text-white border border-violet-600 rounded px-3 py-1.5 font-semibold transition-colors"
+                              >
+                                Generate Clip
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}

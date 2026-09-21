@@ -8,6 +8,8 @@ const FAL_DIRECT_URL = "https://fal.run/fal-ai/chatterbox/text-to-speech";
 export interface ChatterboxResult {
   audioBase64: string;
   audioMime: string;
+  /** Original fal.ai CDN URL — publicly accessible, valid for the session. Used as lipsync audio source. */
+  audioUrl: string;
 }
 
 export async function synthesizeChatterbox(
@@ -63,5 +65,5 @@ export async function synthesizeChatterbox(
   const buffer = await audioRes.arrayBuffer();
   const audioBase64 = Buffer.from(buffer).toString("base64");
 
-  return { audioBase64, audioMime: contentType };
+  return { audioBase64, audioMime: contentType, audioUrl };
 }

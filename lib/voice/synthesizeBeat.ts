@@ -15,6 +15,8 @@ export interface BeatAudioResult {
   audioBase64: string;
   audioMime: string;      // "audio/mp3" | "audio/wav"
   engine: "grok" | "chatterbox";
+  /** Publicly accessible CDN URL for the audio file. Only set for Chatterbox; used as lipsync source. */
+  audioUrl?: string;
   exaggeration?: number;
   cfg?: number;
 }
@@ -50,6 +52,7 @@ export async function routeBeat(
         cleanText,
         audioBase64: result.audioBase64,
         audioMime: result.audioMime,
+        audioUrl: result.audioUrl,
         engine: "chatterbox",
         exaggeration: params.exaggeration,
         cfg: params.cfg,
