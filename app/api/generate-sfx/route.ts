@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateSfx } from "@/lib/audio/elevenLabsSfx";
+import { generateSfx } from "@/lib/audio/soundEffects";
 
 interface SfxRequestBody {
   beats: Array<{
@@ -10,8 +10,8 @@ interface SfxRequestBody {
 }
 
 export async function POST(req: NextRequest) {
-  if (!process.env.ELEVENLABS_API_KEY) {
-    return NextResponse.json({ error: "ELEVENLABS_API_KEY not configured" }, { status: 503 });
+  if (!process.env.WAVESPEED_API_KEY) {
+    return NextResponse.json({ error: "WAVESPEED_API_KEY not configured" }, { status: 503 });
   }
 
   let body: SfxRequestBody;

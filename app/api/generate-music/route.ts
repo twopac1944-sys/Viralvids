@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateMusic } from "@/lib/audio/elevenLabsMusic";
+import { generateMusic } from "@/lib/audio/music";
 
 interface MusicRequestBody {
   musicDirection: string;
@@ -7,8 +7,8 @@ interface MusicRequestBody {
 }
 
 export async function POST(req: NextRequest) {
-  if (!process.env.ELEVENLABS_API_KEY) {
-    return NextResponse.json({ error: "ELEVENLABS_API_KEY not configured" }, { status: 503 });
+  if (!process.env.WAVESPEED_API_KEY) {
+    return NextResponse.json({ error: "WAVESPEED_API_KEY not configured" }, { status: 503 });
   }
 
   let body: MusicRequestBody;
