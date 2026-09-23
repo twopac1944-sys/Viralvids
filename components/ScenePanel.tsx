@@ -31,7 +31,8 @@ export default function ScenePanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           scene: { ...scene, useVoiceReference: voiceRefToggle[sceneId] ?? false },
-          characters: story.characters
+          characters: story.characters,
+          ...(story.brandEmbed && { brandEmbed: story.brandEmbed }),
         })
       });
       const data = await res.json();

@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     hookNote?: string;
     loopEndingNote?: string;
     manualOutline?: string;
-    brandEmbed?: { brandName: string };
+    brandEmbed?: { brandName: string; logoImageUrl?: string };
   };
 
   try {
@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
     ...(hookNote?.trim() && { hookNote: hookNote.trim() }),
     ...(loopEndingNote?.trim() && { loopEndingNote: loopEndingNote.trim() }),
     ...(manualOutline?.trim() && { manualOutline: manualOutline.trim() }),
-    ...(brandEmbed?.brandName?.trim() && { brandEmbed: { brandName: brandEmbed.brandName.trim() } }),
+    ...(brandEmbed?.brandName?.trim() && { brandEmbed: { brandName: brandEmbed.brandName.trim(), ...(brandEmbed.logoImageUrl && { logoImageUrl: brandEmbed.logoImageUrl }) } }),
     characters: (p.characters as Record<string, unknown>[]).map((c) => ({
       id: c.id as string,
       name: c.name as string,

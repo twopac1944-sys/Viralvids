@@ -14,6 +14,7 @@ export default function CharacterSetupPanel({
 }) {
   const [statuses, setStatuses] = useState<Record<string, SheetStatus>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [overrideUploading, setOverrideUploading] = useState<Record<string, boolean>>({});
 
   // storyRef always holds the latest story so sequential async updates
   // don't overwrite each other (avoids stale-closure race on imageReferenceUrls).
@@ -132,6 +133,40 @@ export default function CharacterSetupPanel({
                   {c.imageReferenceUrls.length !== 1 ? "s" : ""}
                 </p>
               )}
+              <label className="text-xs text-gray-500 cursor-pointer hover:text-gray-300 inline-flex items-center gap-1 mt-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setOverrideUploading((prev) => ({ ...prev, [c.id]: true }));
+                    try {
+                      const fd = new FormData();
+                      fd.append("file", file);
+                      fd.append("folder", "character-refs");
+                      const res = await fetch("/api/upload-image", { method: "POST", body: fd });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error);
+                      const updated: StoryPackage = {
+                        ...storyRef.current,
+                        characters: storyRef.current.characters.map((ch) =>
+                          ch.id === c.id ? { ...ch, imageReferenceUrls: [data.url] } : ch
+                        ),
+                      };
+                      onStoryUpdated(updated);
+                      setStatuses((prev) => ({ ...prev, [c.id]: "done" }));
+                    } catch (err: any) {
+                      setErrors((prev) => ({ ...prev, [c.id]: err.message }));
+                    } finally {
+                      setOverrideUploading((prev) => ({ ...prev, [c.id]: false }));
+                      e.target.value = "";
+                    }
+                  }}
+                />
+                {overrideUploading[c.id] ? "Uploading…" : "Replace with your own image"}
+              </label>
             </div>
           </div>
         );

@@ -9,7 +9,7 @@ export interface SceneStoryRequest {
   hookNote?: string;
   loopEndingNote?: string;
   manualOutline?: string;
-  brandEmbed?: { brandName: string };
+  brandEmbed?: { brandName: string; logoImageUrl?: string };
 }
 
 const SCENE_COUNT: Record<number, string> = {

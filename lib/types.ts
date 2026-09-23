@@ -56,7 +56,7 @@ export interface StoryPackage {
   hookNote?: string;
   loopEndingNote?: string;
   manualOutline?: string;
-  brandEmbed?: { brandName: string };
+  brandEmbed?: { brandName: string; logoImageUrl?: string };
   characters: CharacterReference[];
   scenes: SceneJob[];
   createdAt: string;
@@ -73,7 +73,13 @@ export interface RenderResult {
 
 // Builds the "Use Image 1 as the locked character reference..." style prompt
 // H3's reference-to-video mode expects, from a scene + its characters.
-export function buildH3Prompt(scene: SceneJob, characters: CharacterReference[]): string {
+// brandEmbed is optional — when logoImageUrl is present and the brand name appears
+// in the scene description, a logo reference line is appended after character refs.
+export function buildH3Prompt(
+  scene: SceneJob,
+  characters: CharacterReference[],
+  brandEmbed?: { brandName: string; logoImageUrl?: string }
+): string {
   const involvedIds = new Set(scene.dialogue.map((d) => d.characterId));
   const involvedChars = characters.filter((c) => involvedIds.has(c.id));
 
@@ -81,9 +87,20 @@ export function buildH3Prompt(scene: SceneJob, characters: CharacterReference[])
   // Voice-only characters (empty imageReferenceUrls) are skipped so H3 doesn't
   // receive a nonsensical "Preserve: Voice only..." visual instruction.
   const visualChars = involvedChars.filter((c) => c.imageReferenceUrls.length > 0);
-  const referenceLines = visualChars
+  const charRefLines = visualChars
     .map((c, i) => `Use Image ${i + 1} as the locked character reference for ${c.name}. Preserve: ${c.appearance}.`)
     .join("\n");
+
+  // Logo reference — only injected when a logo URL is provided AND the brand name
+  // appears in this scene's description (so we don't waste a reference slot on
+  // scenes where the brand isn't visible).
+  const logoRefLine =
+    brandEmbed?.logoImageUrl &&
+    scene.sceneDescription.toLowerCase().includes(brandEmbed.brandName.toLowerCase())
+      ? `Use Image ${visualChars.length + 1} as the exact logo reference for ${brandEmbed.brandName}. Reproduce it precisely where it appears in the scene, unaltered.`
+      : "";
+
+  const referenceLines = [charRefLines, logoRefLine].filter(Boolean).join("\n");
 
   const dialogueLines = scene.dialogue
     .map((d) => {

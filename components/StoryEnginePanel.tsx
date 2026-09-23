@@ -22,6 +22,8 @@ export default function StoryEnginePanel({
   const [premise, setPremise] = useState("");
   const [manualOutline, setManualOutline] = useState("");
   const [brandName, setBrandName] = useState("");
+  const [logoImageUrl, setLogoImageUrl] = useState("");
+  const [logoUploading, setLogoUploading] = useState(false);
   const [hookNote, setHookNote] = useState("");
   const [loopEndingNote, setLoopEndingNote] = useState("");
   const [seriesMode, setSeriesMode] = useState(false);
@@ -45,7 +47,7 @@ export default function StoryEnginePanel({
         body.seriesContext = { episodeNumber, priorEpisodeSummary: priorEpisodeSummary.trim() };
       }
       if (manualOutline.trim())   body.manualOutline   = manualOutline.trim();
-      if (brandName.trim())       body.brandEmbed      = { brandName: brandName.trim() };
+      if (brandName.trim())       body.brandEmbed      = { brandName: brandName.trim(), ...(logoImageUrl && { logoImageUrl }) };
       if (hookNote.trim())        body.hookNote        = hookNote.trim();
       if (loopEndingNote.trim())  body.loopEndingNote  = loopEndingNote.trim();
 
@@ -152,9 +154,53 @@ export default function StoryEnginePanel({
         <input
           className="w-full bg-white border border-border rounded px-3 py-2 text-sm text-black"
           value={brandName}
-          onChange={(e) => setBrandName(e.target.value)}
+          onChange={(e) => { setBrandName(e.target.value); if (!e.target.value.trim()) setLogoImageUrl(""); }}
           placeholder="e.g. Acme Coffee — placed as background scenery, no dialogue"
         />
+        {brandName.trim() && (
+          <div className="flex items-center gap-3 pt-1">
+            <label className="text-xs text-gray-500 cursor-pointer hover:text-gray-300 flex items-center gap-1.5">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setLogoUploading(true);
+                  try {
+                    const fd = new FormData();
+                    fd.append("file", file);
+                    fd.append("folder", "brand-logos");
+                    const res = await fetch("/api/upload-image", { method: "POST", body: fd });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error);
+                    setLogoImageUrl(data.url);
+                  } catch (err: any) {
+                    setError(err.message);
+                  } finally {
+                    setLogoUploading(false);
+                    e.target.value = "";
+                  }
+                }}
+              />
+              {logoUploading ? "Uploading…" : logoImageUrl ? "Replace logo" : "Upload logo image (optional)"}
+            </label>
+            {logoImageUrl && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={logoImageUrl} alt="logo preview" className="h-7 w-auto rounded border border-border object-contain bg-white" />
+                <button
+                  type="button"
+                  onClick={() => setLogoImageUrl("")}
+                  className="text-xs text-gray-600 hover:text-red-400"
+                >
+                  Remove
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Hook / Loop ending notes */}
