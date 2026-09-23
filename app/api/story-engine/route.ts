@@ -62,7 +62,7 @@ function isValidStoryShape(data: unknown): boolean {
 export async function POST(req: NextRequest) {
   let body: {
     genre: string;
-    premise: string;
+    premise?: string;
     tone: string;
     targetLengthSeconds: number;
     seriesContext?: { episodeNumber: number; priorEpisodeSummary: string };
@@ -80,8 +80,8 @@ export async function POST(req: NextRequest) {
 
   const { genre, premise, tone, targetLengthSeconds, seriesContext, hookNote, loopEndingNote, manualOutline, brandEmbed } = body;
 
-  if (!genre || !premise) {
-    return NextResponse.json({ error: "genre and premise are required" }, { status: 400 });
+  if (!genre) {
+    return NextResponse.json({ error: "genre is required" }, { status: 400 });
   }
   if (!VALID_TONES.has(tone)) {
     return NextResponse.json({ error: `Invalid tone: ${tone}` }, { status: 400 });
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
     storyId: crypto.randomUUID(),
     title: p.title as string,
     genre,
-    premise,
+    premise: premise ?? "",
     tone: tone as "dark" | "neutral" | "uplifting",
     targetLengthSeconds: targetLengthSeconds as 30 | 60 | 90 | 180,
     ...(seriesContext && { seriesContext }),

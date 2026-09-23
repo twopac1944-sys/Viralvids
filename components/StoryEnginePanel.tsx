@@ -268,7 +268,7 @@ export default function StoryEnginePanel({
 
       <button
         onClick={generate}
-        disabled={loading || !premise.trim()}
+        disabled={loading}
         className="bg-accent text-black font-medium px-4 py-2 rounded text-sm disabled:opacity-40"
       >
         {loading ? "Generating..." : "Generate Story Package"}

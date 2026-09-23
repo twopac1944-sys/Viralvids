@@ -2,7 +2,7 @@ import { getGenre } from "@/lib/genres/genres";
 
 export interface SceneStoryRequest {
   genre: string;
-  premise: string;
+  premise?: string;
   tone: "dark" | "neutral" | "uplifting";
   targetLengthSeconds: 30 | 60 | 90 | 180;
   seriesContext?: { episodeNumber: number; priorEpisodeSummary: string };
@@ -117,17 +117,17 @@ Return ONLY valid JSON. No preamble, no markdown fences, no explanation, no trai
   ]
 }`;
 
+  const premiseLine = req.premise?.trim() ? `Premise: ${req.premise.trim()}\n` : "";
+
   const user = req.manualOutline
     ? `Genre: ${genreName}
 Tone: ${req.tone}
-Premise: ${req.premise}
-Manual Outline: ${req.manualOutline}
+${premiseLine}Manual Outline: ${req.manualOutline}
 
 Break this outline into ${sceneCount} for a ~${req.targetLengthSeconds}-second video. Follow the outline's story closely — add production detail only. Apply all hook and loop ending rules exactly.`
     : `Genre: ${genreName}
 Tone: ${req.tone}
-Premise: ${req.premise}
-
+${premiseLine}
 Write ${sceneCount} for a ~${req.targetLengthSeconds}-second video. Apply all hook and loop ending rules exactly.`;
 
   return { system, user };
