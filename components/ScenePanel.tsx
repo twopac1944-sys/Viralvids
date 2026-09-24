@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { StoryPackage, RenderResult } from "@/lib/types";
 
 export default function ScenePanel({
@@ -14,6 +14,61 @@ export default function ScenePanel({
 }) {
   const [voiceRefToggle, setVoiceRefToggle] = useState<Record<number, boolean>>({});
   const [renderingIds, setRenderingIds] = useState<Set<number>>(new Set());
+  const [taskIds, setTaskIds] = useState<Record<number, string>>({});
+  const [progress, setProgress] = useState<Record<number, number>>({});
+  const pollTimers = useRef<Record<number, ReturnType<typeof setInterval>>>({});
+
+  function startPolling(sceneId: number, taskId: string) {
+    // Animate progress bar from 0 → 90% over ~60s, then hold until complete
+    let tick = 0;
+    setProgress((p) => ({ ...p, [sceneId]: 0 }));
+
+    const timer = setInterval(async () => {
+      tick++;
+      // Ease toward 90% asymptotically
+      setProgress((p) => ({
+        ...p,
+        [sceneId]: Math.min(90, Math.round(90 * (1 - Math.exp(-tick / 20))))
+      }));
+
+      try {
+        const res = await fetch(`/api/poll-scene?taskId=${taskId}`);
+        const data = await res.json();
+
+        if (data.status === "complete") {
+          clearInterval(timer);
+          delete pollTimers.current[sceneId];
+          setProgress((p) => ({ ...p, [sceneId]: 100 }));
+          setRenderingIds((prev) => { const next = new Set(prev); next.delete(sceneId); return next; });
+          onRenderResult(sceneId, {
+            sceneId,
+            status: "complete",
+            videoUrl: data.videoUrl,
+            usedVoiceReference: voiceRefToggle[sceneId] ?? false
+          });
+        } else if (data.status === "failed") {
+          clearInterval(timer);
+          delete pollTimers.current[sceneId];
+          setRenderingIds((prev) => { const next = new Set(prev); next.delete(sceneId); return next; });
+          onRenderResult(sceneId, {
+            sceneId,
+            status: "failed",
+            errorMessage: data.error ?? "Render failed",
+            usedVoiceReference: voiceRefToggle[sceneId] ?? false
+          });
+        }
+      } catch {
+        // network hiccup — keep polling
+      }
+    }, 3000);
+
+    pollTimers.current[sceneId] = timer;
+  }
+
+  // Clean up all timers on unmount
+  useEffect(() => {
+    return () => { Object.values(pollTimers.current).forEach(clearInterval); };
+  }, []);
 
   // Block rendering until all visual characters have a reference image.
   const sheetsReady = story.characters
@@ -38,11 +93,15 @@ export default function ScenePanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
+      setTaskIds((prev) => ({ ...prev, [sceneId]: data.taskId }));
       onRenderResult(sceneId, {
         sceneId,
         status: "rendering",
         usedVoiceReference: voiceRefToggle[sceneId] ?? false
       });
+      startPolling(sceneId, data.taskId);
+      // Note: renderingIds cleared by polling, not here
+      return;
     } catch (err: any) {
       onRenderResult(sceneId, {
         sceneId,
@@ -50,12 +109,7 @@ export default function ScenePanel({
         errorMessage: err.message,
         usedVoiceReference: voiceRefToggle[sceneId] ?? false
       });
-    } finally {
-      setRenderingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(sceneId);
-        return next;
-      });
+      setRenderingIds((prev) => { const next = new Set(prev); next.delete(sceneId); return next; });
     }
   }
 
@@ -113,11 +167,26 @@ export default function ScenePanel({
 
             <button
               onClick={() => renderScene(scene.sceneId)}
-              disabled={isRendering || !sheetsReady}
+              disabled={isRendering || result?.status === "rendering" || !sheetsReady}
               className="bg-accent text-black text-sm font-medium px-3 py-1.5 rounded disabled:opacity-40"
             >
-              {isRendering ? "Rendering..." : "Generate Scene"}
+              {isRendering ? "Submitting…" : result?.status === "rendering" ? "Rendering…" : "Generate Scene"}
             </button>
+
+            {result?.status === "rendering" && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-gray-400">
+                  <span className="animate-pulse">H3 rendering — checking every 3s…</span>
+                  <span>{progress[scene.sceneId] ?? 0}%</span>
+                </div>
+                <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="h-1.5 rounded-full bg-accent transition-all duration-1000"
+                    style={{ width: `${progress[scene.sceneId] ?? 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             {result?.videoUrl && (
               <video controls className="w-full rounded mt-2" src={result.videoUrl} />
