@@ -71,10 +71,10 @@ export interface RenderResult {
   costEstimateUsd?: number;
 }
 
-// Builds the "Use Image 1 as the locked character reference..." style prompt
-// H3's reference-to-video mode expects, from a scene + its characters.
-// brandEmbed is optional — when logoImageUrl is present and the brand name appears
-// in the scene description, a logo reference line is appended after character refs.
+// Builds the H3 reference-to-video prompt.
+// Each character gets an explicit Image N / Audio N binding in the header,
+// and that binding is restated on every dialogue line so H3 never confuses speakers.
+// brandEmbed is optional — logo reference injected only when brand appears in scene.
 export function buildH3Prompt(
   scene: SceneJob,
   characters: CharacterReference[],
@@ -83,31 +83,52 @@ export function buildH3Prompt(
   const involvedIds = new Set(scene.dialogue.map((d) => d.characterId));
   const involvedChars = characters.filter((c) => involvedIds.has(c.id));
 
-  // Only include reference lines for characters that have images attached.
-  // Voice-only characters (empty imageReferenceUrls) are skipped so H3 doesn't
-  // receive a nonsensical "Preserve: Voice only..." visual instruction.
+  // Visual chars only — voice-only characters have no image slot.
   const visualChars = involvedChars.filter((c) => c.imageReferenceUrls.length > 0);
-  const charRefLines = visualChars
-    .map((c, i) => `Use Image ${i + 1} as the locked character reference for ${c.name}. Preserve: ${c.appearance}.`)
-    .join("\n");
 
-  // Logo reference — only injected when a logo URL is provided AND the brand name
-  // appears in this scene's description (so we don't waste a reference slot on
-  // scenes where the brand isn't visible).
+  // Build a lookup: characterId → { imageIdx, audioIdx }
+  // audioIdx is only assigned when the character has a voiceReferenceUrl.
+  let audioCounter = 0;
+  const charBinding = new Map<string, { imageIdx: number; audioIdx: number | null }>();
+  visualChars.forEach((c, i) => {
+    const hasAudio = !!c.voiceReferenceUrl;
+    charBinding.set(c.id, {
+      imageIdx: i + 1,
+      audioIdx: hasAudio ? ++audioCounter : null,
+    });
+  });
+
+  // Header: one line per character declaring both bindings explicitly.
+  const charRefLines = visualChars.map((c) => {
+    const b = charBinding.get(c.id)!;
+    const imageLine = `Use Image ${b.imageIdx} as the visual reference for ${c.name}. Preserve appearance: ${c.appearance}.`;
+    const audioLine = b.audioIdx !== null
+      ? `Use Audio ${b.audioIdx} as the voice reference for ${c.name}.`
+      : null;
+    return [imageLine, audioLine].filter(Boolean).join(" ");
+  }).join("\n");
+
+  // Logo reference slot (after character images).
+  const logoImageIdx = visualChars.length + 1;
   const logoRefLine =
     brandEmbed?.logoImageUrl &&
     scene.sceneDescription.toLowerCase().includes(brandEmbed.brandName.toLowerCase())
-      ? `Use Image ${visualChars.length + 1} as the exact logo reference for ${brandEmbed.brandName}. Reproduce it precisely where it appears in the scene, unaltered.`
+      ? `Use Image ${logoImageIdx} as the exact logo reference for ${brandEmbed.brandName}. Reproduce it precisely where it appears in the scene, unaltered.`
       : "";
 
   const referenceLines = [charRefLines, logoRefLine].filter(Boolean).join("\n");
 
-  const dialogueLines = scene.dialogue
-    .map((d) => {
-      const speaker = characters.find((c) => c.id === d.characterId);
-      return `${speaker?.name ?? d.characterId} speaks, delivered ${d.delivery}: "${d.line}"`;
-    })
-    .join("\n");
+  // Dialogue: restate image/audio binding on every line so H3 keeps voices separated.
+  const dialogueLines = scene.dialogue.map((d) => {
+    const speaker = characters.find((c) => c.id === d.characterId);
+    const b = speaker ? charBinding.get(speaker.id) : undefined;
+    const refTag = b
+      ? b.audioIdx !== null
+        ? `(Image ${b.imageIdx} / Audio ${b.audioIdx})`
+        : `(Image ${b.imageIdx})`
+      : "";
+    return `${speaker?.name ?? d.characterId} ${refTag} speaks, delivered ${d.delivery}: "${d.line}"`;
+  }).join("\n");
 
   return [
     referenceLines,
@@ -118,7 +139,7 @@ export function buildH3Prompt(
     "",
     dialogueLines,
     "",
-    `Ambient sound: ${scene.soundFx.join(", ")}.`,
-    `Music: ${scene.musicCue}.`
+    `ambient_sound: ${scene.soundFx.join(", ")}.`,
+    `non_diegetic_music: ${scene.musicCue}, continuous under the scene, mixed beneath the dialogue.`,
   ].join("\n");
 }

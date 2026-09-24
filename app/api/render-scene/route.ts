@@ -24,10 +24,9 @@ export async function POST(req: NextRequest) {
       referenceImages.push(brandEmbed.logoImageUrl);
     }
 
-    const referenceAudio =
-      scene.useVoiceReference && involvedChars[0]?.voiceReferenceUrl
-        ? [involvedChars[0].voiceReferenceUrl]
-        : [];
+    const referenceAudio = scene.useVoiceReference
+      ? involvedChars.flatMap((c) => c.voiceReferenceUrl ? [c.voiceReferenceUrl] : [])
+      : [];
 
     const prompt = buildH3Prompt(scene, characters, brandEmbed);
 
